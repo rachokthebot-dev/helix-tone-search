@@ -78,7 +78,11 @@ function buildFacets() {
 }
 
 // ---- typewriter placeholder (idle only) ----
-const EXAMPLES = ['nirvana', 'green day', 'david gilmour', 'metallica enter sandman', 'ambient clean delay', 'pink floyd', 'djent high-gain'];
+const EXAMPLES = [
+  'nirvana', 'metallica enter sandman', 'gilmour lead delay', 'deftones drop tuning',
+  'marshall jcm800 crunch', 'dumble clean', 'ambient looper', 'djent high-gain rhythm',
+  'tool pitch shifter', 'red hot chili peppers funk', 'snapshots gig rig', 'klon blues lead',
+];
 let tw = { i: 0, j: 0, del: false, timer: null };
 function typeStep() {
   const word = EXAMPLES[tw.i % EXAMPLES.length];
@@ -133,18 +137,25 @@ const bandBlob = r => [r.band, r.song, r.artist, r.band_norm, r.band_inferred, r
   ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || [])]
   .filter(Boolean).join(' ').toLowerCase();
 const isBandMatch = r => queryTerms.length && queryTerms.every(w => bandBlob(r).includes(w));
+// a "real" match = every query term appears literally somewhere (not fuzzy) — used to tell
+// genuine hits apart from the semantic tail and to detect no-match queries.
+const searchText = r => [r.name, r.band, r.song, r.artist, r.style, r.band_norm, r.band_inferred, r.song_inferred,
+  ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || []),
+  ...(r.genre_tags || []), ...(r.tone_tags || []), ...(r.gear || []), ...(r.features || [])]
+  .filter(Boolean).join(' ').toLowerCase();
+const isRealMatch = r => queryTerms.length && queryTerms.every(w => searchText(r).includes(w));
 
-function rankItems(ranked, sort, lexSet) {
+function rankItems(ranked, sort) {
   let items = ranked.map(([i, s]) => ({ row: presets[i], score: s, i })).filter(x => passes(x.row));
   if (sort === 'downloads') { items.sort((a, b) => b.row.downloads - a.row.downloads); return items.slice(0, MAX_RESULTS); }
   if (sort === 'newest') { items.sort((a, b) => (b.row.date || '').localeCompare(a.row.date || '')); return items.slice(0, MAX_RESULTS); }
   if (!queryTerms.length) return items.slice(0, MAX_RESULTS);
-  // relevance: band/song matches (by downloads), then other keyword matches, then a labelled
-  // "related" tail of pure semantic neighbours that didn't literally match the query.
+  // relevance: band/song matches (by downloads), then other literal matches, then a labelled
+  // "related" tail of semantic neighbours that didn't literally match the query.
   const band = items.filter(x => isBandMatch(x.row)).sort((a, b) => b.row.downloads - a.row.downloads);
   const bandSet = new Set(band.map(x => x.i));
-  const other = items.filter(x => !bandSet.has(x.i) && lexSet.has(x.i));
-  const related = items.filter(x => !bandSet.has(x.i) && !lexSet.has(x.i));
+  const other = items.filter(x => !bandSet.has(x.i) && isRealMatch(x.row));
+  const related = items.filter(x => !bandSet.has(x.i) && !isRealMatch(x.row));
   related.forEach(x => (x.related = true));
   return [...band, ...other, ...related].slice(0, MAX_RESULTS);
 }
@@ -157,24 +168,30 @@ async function render() {
   stopTyping(); view.hidden = false;
 
   const lex = mini.search(query).map(h => h._i);
-  const lexSet = new Set(lex);
-  paint(rankItems(lex.map(i => [i, 0]), sort, lexSet));         // instant keyword pass
-  try { const sem = await semanticRanks(query); paint(rankItems(rrf(lex, sem), sort, lexSet)); }
+  paint(rankItems(lex.map(i => [i, 0]), sort));         // instant keyword pass
+  try { const sem = await semanticRanks(query); paint(rankItems(rrf(lex, sem), sort)); }
   catch { /* keyword results already shown */ }
 }
 
 // ---- paint ----
 function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function paint(items) {
+  const q = $('q').value.trim();
+  const hasMatches = items.some(x => !x.related);
   const bandHits = items.filter(x => isBandMatch(x.row)).length;
-  countEl.innerHTML = `<b>${items.length}</b> result${items.length === 1 ? '' : 's'}` +
-    (bandHits ? ` <span class="cband">· ${bandHits} by band/song</span>` : '');
+  countEl.innerHTML = (q && items.length && !hasMatches)
+    ? `<b>0</b> matches <span class="cband">· ${items.length} similar</span>`
+    : `<b>${items.length}</b> result${items.length === 1 ? '' : 's'}` +
+      (bandHits ? ` <span class="cband">· ${bandHits} by band/song</span>` : '');
   if (!items.length) {
     resultsEl.innerHTML = `<div class="empty"><b>No matches.</b> Try a broader query or clear the filters.</div>`;
     return;
   }
-  const hasMatches = items.some(x => !x.related);
   let html = '', dividerDone = false;
+  if (q && !hasMatches) {   // nothing literally matched — say so, then show closest-sounding tones
+    html += `<div class="notice">No preset matches “${esc(q)}” — showing the closest-sounding tones instead.</div>`;
+    dividerDone = true;
+  }
   items.forEach((x, i) => {
     if (x.related && hasMatches && !dividerDone) { html += `<div class="divider">Related tones</div>`; dividerDone = true; }
     html += card(x.row, x.score, i);
