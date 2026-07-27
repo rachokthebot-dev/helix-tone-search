@@ -48,8 +48,15 @@ Return JSON with exactly these keys:
                                     // shorthand (e.g. "CAYA" for "Come As You Are"). [] if none.
   "band_inferred": string or null,  // ONLY if band is blank: a band clearly implied by name/description. Be
                                     // conservative; null unless confident. NEVER infer from gear/amp/pickup terms.
-  "song_inferred": string or null   // ONLY if song is blank: a song clearly implied by name/description. null unless confident.
-}}"""
+  "song_inferred": string or null,  // ONLY if song is blank: a song clearly implied by name/description. null unless confident.
+  "mentioned_bands": [string],      // real bands/artists referenced in the name or description beyond the band field (canonical). [] if none.
+  "mentioned_songs": [string],      // songs referenced in the name or description. [] if none.
+  "gear": [string],                 // specific amp/cab/pedal/effect MODELS named in the description (e.g. "Marshall JCM800",
+                                    // "Klon Centaur", "Gallien-Krueger", "Strymon Timeline"). Omit generic words like "amp"/"delay"/"reverb".
+  "features": [string]              // signal-chain features present, e.g. "snapshots","looper","compressor","IR","expression pedal","pitch shifter","wah","bass","acoustic". [] if none.
+}}
+
+Only include facts actually supported by the text; use empty arrays / null when unsure."""
 
 
 def call_llm(rec: dict, timeout: float) -> dict:
@@ -85,6 +92,10 @@ def build_record(rec: dict, llm: dict) -> dict:
     # inference only fills blanks — never overwrite an uploader value
     out["band_inferred"] = cstr(llm.get("band_inferred")) if not rec.get("band") else None
     out["song_inferred"] = cstr(llm.get("song_inferred")) if not rec.get("song") else None
+    out["mentioned_bands"] = clist(llm.get("mentioned_bands"))
+    out["mentioned_songs"] = clist(llm.get("mentioned_songs"))
+    out["gear"] = clist(llm.get("gear"), 8)
+    out["features"] = clist(llm.get("features"), 8)
     return out
 
 

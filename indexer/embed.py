@@ -22,7 +22,8 @@ DIMS = 384
 DISPLAY_FIELDS = ["id", "name", "author", "band", "song", "artist", "amp",
                   "style", "device", "downloads", "date", "genre_tags",
                   "tone_tags", "enrich_source", "url",
-                  "band_norm", "bands", "aliases", "band_inferred", "song_inferred"]
+                  "band_norm", "bands", "aliases", "band_inferred", "song_inferred",
+                  "mentioned_bands", "mentioned_songs", "gear", "features"]
 
 
 def compose(rec: dict) -> str:
@@ -30,7 +31,9 @@ def compose(rec: dict) -> str:
         rec.get("name") or "",
         " ".join(filter(None, [rec.get("band"), rec.get("song"), rec.get("artist")])),
         " ".join(filter(None, [rec.get("band_norm"), rec.get("band_inferred"), rec.get("song_inferred")]
-                        + (rec.get("bands") or []) + (rec.get("aliases") or []))),
+                        + (rec.get("bands") or []) + (rec.get("aliases") or [])
+                        + (rec.get("mentioned_bands") or []) + (rec.get("mentioned_songs") or []))),
+        " ".join((rec.get("gear") or []) + (rec.get("features") or [])),
         rec.get("style") or "",
         " ".join(rec.get("genre_tags") or []),
         " ".join(rec.get("tone_tags") or []),
@@ -66,11 +69,9 @@ def main():
 
     (outdir / "vectors.bin").write_bytes(q.tobytes())
 
-    presets = []
-    for r in rows:
-        d = {k: r.get(k) for k in DISPLAY_FIELDS}
-        d["description"] = (r.get("description") or "")[:500]
-        presets.append(d)
+    # Verbatim descriptions (user-authored text) are intentionally NOT published — the
+    # useful signal is extracted into structured fields above and kept in the embedding.
+    presets = [{k: r.get(k) for k in DISPLAY_FIELDS} for r in rows]
     (outdir / "presets.json").write_text(json.dumps(presets, ensure_ascii=False))
 
     meta = {
