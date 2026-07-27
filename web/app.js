@@ -10,6 +10,22 @@ const MAX_RESULTS = 60, RRF_K = 60, LS_KEY = 'helix.searchSettings', CTRLS = ['s
 let presets = [], vectors = null, meta = null, mini = null;
 let extractor = null, extractorLoading = null, queryTerms = [];
 
+// Color-code cards by genre/tone family (order matters: most specific first).
+const FAMILIES = [
+  { key: 'metal',    color: '#d64545', kw: ['metal', 'djent', 'core', 'grind', 'death', 'thrash', 'doom', 'black'] },
+  { key: 'blues',    color: '#4a7fd6', kw: ['blues'] },
+  { key: 'jazz',     color: '#9b6bd6', kw: ['jazz', 'fusion'] },
+  { key: 'ambient',  color: '#3fb0a0', kw: ['ambient', 'atmospher', 'post-', 'shoegaze', 'clean'] },
+  { key: 'acoustic', color: '#5aa564', kw: ['acoustic', 'folk', 'country', 'worship', 'praise', 'gospel'] },
+  { key: 'pop/funk', color: '#d65a9e', kw: ['pop', 'funk', 'soul', 'r&b', 'disco', 'synth'] },
+  { key: 'rock',     color: '#dd7a2e', kw: ['rock', 'punk', 'grunge', 'alternative', 'indie'] },
+];
+const OTHER = { key: 'other', color: '#8a8a8a' };
+function family(r) {
+  const tags = [...(r.genre_tags || []), ...(r.tone_tags || [])].join(' ').toLowerCase();
+  return FAMILIES.find(f => f.kw.some(k => tags.includes(k))) || OTHER;
+}
+
 async function boot() {
   const [m, p, vb] = await Promise.all([
     fetch('data/meta.json').then(r => r.json()),
@@ -30,12 +46,18 @@ async function boot() {
   })));
 
   buildFacets();
+  buildLegend();
   loadSettings();
   statusEl.classList.remove('loading');
   statusEl.innerHTML = `<span class="dot"></span>${presets.length.toLocaleString()} tones indexed · search by band, song, or vibe`;
   wire();
   startTyping();
   render();
+}
+
+function buildLegend() {
+  $('legend').innerHTML = [...FAMILIES, OTHER]
+    .map(f => `<span><i style="background:${f.color}"></i>${f.key}</span>`).join('');
 }
 
 function buildFacets() {
@@ -139,7 +161,7 @@ function card(r, score, idx) {
   const chips = [...(r.genre_tags || []).slice(0, 3).map(g => `<span class="chip g">${esc(g)}</span>`),
     ...(r.tone_tags || []).slice(0, 4).map(t => `<span class="chip t">${esc(t)}</span>`)].join('');
   const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
-  return `<article class="card" style="animation-delay:${delay}ms">
+  return `<article class="card" style="--stripe:${family(r).color};animation-delay:${delay}ms">
     <div class="cardtop"><span class="device">${esc(r.device || 'Helix')}</span>
       <span class="dls"><b>${(r.downloads || 0).toLocaleString()}</b> dl</span></div>
     <h3 class="name"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.name || 'Untitled')}</a></h3>${bl}

@@ -84,9 +84,9 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px 15px;
     display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden;
     transition:border-color .15s ease,transform .15s ease;animation:rise .32s cubic-bezier(.2,.7,.3,1) both;}
-  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .15s ease;}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--stripe,var(--accent));opacity:.65;transition:opacity .15s ease;}
   .card:hover{border-color:var(--chip-line);transform:translateY(-2px);}
-  .card:hover::before{opacity:.9;}
+  .card:hover::before{opacity:1;}
   .cardtop{display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .device{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);
     border:1px solid var(--chip-line);border-radius:6px;padding:2px 7px;white-space:nowrap;}
@@ -130,3 +130,9 @@
   .repo:hover{color:var(--accent);border-color:var(--accent);}
   .pagefoot .src{color:var(--accent);text-decoration:none;font-weight:600;display:inline-block;margin-top:8px;}
   .pagefoot .src:hover{color:var(--accent-hot);}
+
+  /* ---- genre color-code legend ---- */
+  .legend{display:flex;flex-wrap:wrap;gap:6px 15px;font-family:var(--mono);font-size:11px;
+    color:var(--muted);padding:2px 0 16px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:9px;height:9px;border-radius:2px;flex:none;}
