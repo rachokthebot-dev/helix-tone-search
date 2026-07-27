@@ -134,7 +134,7 @@ def main():
                 with lock:
                     cache[tid] = llm
                     done += 1; ok += int(okk); fail += int(not okk)
-                    if done % 25 == 0:
+                    if done % 10 == 0:
                         cache_path.write_text(json.dumps(cache))
                         print(f"[band] {done}/{len(todo)} (ok={ok} fail={fail}) cached={len(cache)}", file=sys.stderr)
 
