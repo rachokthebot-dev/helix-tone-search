@@ -136,3 +136,5 @@
     color:var(--muted);padding:2px 0 16px;}
   .legend span{display:inline-flex;align-items:center;gap:6px;}
   .legend i{width:9px;height:9px;border-radius:2px;flex:none;}
+
+  .pagefoot .disclaimer{margin:12px 0 0;font-size:11.5px;color:var(--faint);line-height:1.55;}

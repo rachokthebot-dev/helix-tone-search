@@ -106,3 +106,12 @@ so no CDN is required.
 Downloads require a Line 6 login. **Log in at line6.com first**; each result's
 "Open on CustomTone" button deep-links to the preset page, where the download works in
 your session. The app never handles your credentials.
+
+## Legal & attribution
+
+A **non-commercial, fan-made** discovery tool — not affiliated with, sponsored by, or
+endorsed by Line 6 or Yamaha Guitar Group. Catalog *metadata* is drawn from Line 6
+CustomTone with the crawler respecting `robots.txt` (`Crawl-delay: 10`). The preset files
+themselves are **never downloaded or redistributed here** — results deep-link to CustomTone,
+where the presets remain the copyright of their authors. Review Line 6 / Yamaha's
+[Terms of Use](https://yamahaguitargroup.com/termsofuse) before any public or commercial use.
