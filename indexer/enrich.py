@@ -9,9 +9,11 @@ Never invents facts: the prompt tells the model to return null / empty when unsu
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import re
 import sys
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -107,6 +109,21 @@ def clean_list(v, n):
     return out[:n]
 
 
+def build_record(rec: dict, llm: dict) -> dict:
+    had_band = bool(rec.get("band"))
+    band = rec.get("band") or (llm.get("band") if isinstance(llm.get("band"), str) else None)
+    song = rec.get("song") or (llm.get("song") if isinstance(llm.get("song"), str) else None)
+    artist = rec.get("guitarist") or (llm.get("artist") if isinstance(llm.get("artist"), str) else None)
+    out = dict(rec)
+    out.update({
+        "band": band, "song": song, "artist": artist,
+        "genre_tags": clean_list(llm.get("genre_tags"), 4),
+        "tone_tags": clean_list(llm.get("tone_tags"), 5),
+        "enrich_source": "field" if had_band else ("llm" if band else "none"),
+    })
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="inp", default="cache/raw.jsonl")
@@ -114,6 +131,8 @@ def main():
     ap.add_argument("--cache", default="cache/enrich_cache.json")
     ap.add_argument("--timeout", type=float, default=90.0)
     ap.add_argument("--limit", type=int, default=0, help="0 = all")
+    ap.add_argument("--max-new", type=int, default=0, help="stop after N newly-enriched tones (0 = all); rest deferred")
+    ap.add_argument("--workers", type=int, default=6, help="concurrent LLM requests")
     ap.add_argument("--tags-only", action="store_true",
                     help="only generate genre/tone tags; never let the LLM guess band/song")
     args = ap.parse_args()
@@ -125,43 +144,44 @@ def main():
     cache_path = Path(args.cache)
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
 
-    enriched = []
-    ok = fail = 0
-    for i, rec in enumerate(rows, 1):
-        tid = rec["id"]
-        if tid in cache:
-            llm = cache[tid]
-        else:
-            try:
-                llm = call_llm(rec, args.timeout, tags_only=args.tags_only)
-                ok += 1
-            except Exception as e:
-                print(f"[enrich] {tid} failed: {e}", file=sys.stderr)
-                llm = {}
-                fail += 1
-            cache[tid] = llm
-            if i % 10 == 0:
-                cache_path.write_text(json.dumps(cache))
-                print(f"[enrich] {i}/{len(rows)} (ok={ok} fail={fail})", file=sys.stderr)
+    todo = [r for r in rows if r["id"] not in cache]
+    if args.max_new:
+        todo = todo[:args.max_new]
+    print(f"[enrich] {len(cache)} cached, {len(todo)} to process this run "
+          f"(workers={args.workers})", file=sys.stderr)
 
-        had_band = bool(rec.get("band"))
-        band = rec.get("band") or (llm.get("band") if isinstance(llm.get("band"), str) else None)
-        song = rec.get("song") or (llm.get("song") if isinstance(llm.get("song"), str) else None)
-        artist = rec.get("guitarist") or (llm.get("artist") if isinstance(llm.get("artist"), str) else None)
-        out = dict(rec)
-        out.update({
-            "band": band, "song": song, "artist": artist,
-            "genre_tags": clean_list(llm.get("genre_tags"), 4),
-            "tone_tags": clean_list(llm.get("tone_tags"), 5),
-            "enrich_source": "field" if had_band else ("llm" if band else "none"),
-        })
-        enriched.append(out)
+    ok = fail = done = 0
+    lock = threading.Lock()
+
+    def work(rec):
+        try:
+            return rec["id"], call_llm(rec, args.timeout, tags_only=args.tags_only), True
+        except Exception:
+            return rec["id"], {}, False
+
+    if todo:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
+            for fut in concurrent.futures.as_completed([ex.submit(work, r) for r in todo]):
+                tid, llm, okk = fut.result()
+                with lock:
+                    cache[tid] = llm
+                    done += 1
+                    ok += int(okk); fail += int(not okk)
+                    if done % 25 == 0:
+                        cache_path.write_text(json.dumps(cache))
+                        print(f"[enrich] {done}/{len(todo)} new (ok={ok} fail={fail}) "
+                              f"cached={len(cache)}", file=sys.stderr)
 
     cache_path.write_text(json.dumps(cache))
+
+    enriched = [build_record(rec, cache.get(rec["id"], {})) for rec in rows]
     with Path(args.out).open("w") as f:
         for r in enriched:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    print(f"[enrich] wrote {len(enriched)} to {args.out} (llm ok={ok} fail={fail})", file=sys.stderr)
+    tagged = sum(1 for r in enriched if r["genre_tags"] or r["tone_tags"])
+    pending = sum(1 for r in rows if r["id"] not in cache)
+    print(f"[enrich] wrote {len(enriched)} to {args.out}; {tagged} tagged, "
+          f"{pending} still pending (ok={ok} fail={fail})", file=sys.stderr)
 
 
 if __name__ == "__main__":

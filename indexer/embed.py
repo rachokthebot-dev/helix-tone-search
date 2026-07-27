@@ -21,13 +21,16 @@ DIMS = 384
 
 DISPLAY_FIELDS = ["id", "name", "author", "band", "song", "artist", "amp",
                   "style", "device", "downloads", "date", "genre_tags",
-                  "tone_tags", "enrich_source", "url"]
+                  "tone_tags", "enrich_source", "url",
+                  "band_norm", "bands", "aliases", "band_inferred", "song_inferred"]
 
 
 def compose(rec: dict) -> str:
     parts = [
         rec.get("name") or "",
         " ".join(filter(None, [rec.get("band"), rec.get("song"), rec.get("artist")])),
+        " ".join(filter(None, [rec.get("band_norm"), rec.get("band_inferred"), rec.get("song_inferred")]
+                        + (rec.get("bands") or []) + (rec.get("aliases") or []))),
         rec.get("style") or "",
         " ".join(rec.get("genre_tags") or []),
         " ".join(rec.get("tone_tags") or []),

@@ -15,11 +15,11 @@ Covers **~2,900 Helix-family tones** (Helix, Helix LT, Rack, Native).
 ## How it works
 
 ```
-indexer/ (Python, run locally)              web/ (static site, GitHub Pages)
-  scrape.py   listing  -> cache/raw.jsonl     index.html · app.js · style.css
-  enrich.py   local LLM adds genre/tone tags   data/presets.json   metadata
-  embed.py    all-MiniLM-L6-v2 -> vectors       data/vectors.bin    int8 embeddings
-                                                data/meta.json      model + dims
+indexer/ (Python, run locally)                 web/ (static site, GitHub Pages)
+  scrape.py        listing -> cache/raw.jsonl    index.html · app.js · style.css
+  enrich.py        LLM: genre/tone tags          data/presets.json   metadata
+  band_enrich.py   LLM: band/song normalization  data/vectors.bin    int8 embeddings
+  embed.py         all-MiniLM-L6-v2 -> vectors    data/meta.json      model + dims
 ```
 
 In the browser: transformers.js (`Xenova/all-MiniLM-L6-v2`, the same model the indexer
@@ -27,6 +27,36 @@ uses) embeds the query → cosine similarity over `vectors.bin` → fused via Re
 Rank Fusion with a MiniSearch keyword index. **Exact band/song matches always rank
 first** (grouped by downloads), ahead of semantic neighbors. Filters for device, genre,
 and min-downloads persist in `localStorage` across sessions.
+
+## Enrichment
+
+The scraped fields are messy — uploaders type `Rock (Classic, Hard, Progressive)` for
+style, spell bands five different ways (`MUSE`, `Muse`), and cram several bands into one
+field (`AC/DC, GNR`). Two local-LLM passes clean this up and add the signals search needs.
+Both are **concurrent, cached per tone (so re-runs only touch new tones), and resumable.**
+
+**Pass 1 — tags (`enrich.py --tags-only`)** adds, per tone:
+
+- `genre_tags` — normalized genres inferred from the style/name/description
+  (`Rock (Classic, Hard, Progressive)` → `["rock","hard rock"]`; Nirvana → `["rock","grunge"]`).
+- `tone_tags` — tonal descriptors that exist nowhere in the raw data
+  (`["high-gain","distortion"]`, `["clean","delay"]`) — these power the vibe/semantic queries.
+
+  Deliberately **tags-only**: it never touches `band`/`song`, so uploader attribution is
+  never "corrected" into something wrong.
+
+**Pass 2 — band normalization (`band_enrich.py`)** makes band/song lookup reliable:
+
+- `band_norm` — the band in canonical form (fix casing/spelling, expand abbreviations:
+  `GNR → Guns N' Roses`, `RHCP → Red Hot Chili Peppers`).
+- `bands[]` — multi-band fields split into a list (`AC/DC, GNR` → `["AC/DC","Guns N' Roses"]`).
+- `aliases[]` — extra search terms: band nicknames and song shorthand (`CAYA → Come As You Are`).
+- `band_inferred` / `song_inferred` — **only** when the field is blank *and* the name/description
+  clearly implies one; conservative (most blank-band tones are gear-named, so this fills ~3–5%),
+  stored separately so the original field is never overwritten and the UI can flag it as a guess.
+
+All of these feed the browser search index (so `GNR`, `Guns N Roses`, and multi-band presets
+all match), the embedding text, the color-coded genre families, and the genre facet.
 
 ## What CustomTone's browse actually exposes
 
@@ -41,20 +71,23 @@ Reverse-engineered constraints that shape the crawler:
 - **Ratings are JS-rendered** and absent from the server HTML, so ranking uses
   **downloads** as the popularity signal.
 
-## Build the index
+## Build & refresh the index
+
+`update.sh` runs the whole pipeline on demand — scrape → tag enrichment → band
+normalization → embed → commit → push (the push redeploys GitHub Pages):
 
 ```bash
-cd indexer
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python build.py --full --tags-only     # full union crawl (~75 min at 10s delay) + enrich + embed
+./update.sh          # incremental: only new tones are crawled, enriched, embedded (minutes)
+./update.sh --full   # rebuild from scratch: re-crawl every sort field (~75 min) + enrich + embed
 ```
 
-- `--full` crawls each sort field to its ~50-page cap and unions the results.
-- `--tags-only` enrichment adds `genre_tags`/`tone_tags` and never invents band/song
-  (uploaders already fill those; the LLM only guesses when it shouldn't).
-- Enrichment calls a local OpenAI-compatible LLM at `http://localhost:11500` — adjust
-  `ENDPOINT`/`MODEL` in `enrich.py`, or `--skip-enrich`.
-- Re-runs are incremental (per-sort resume state) and enrichment is cached per tone.
+The first run bootstraps the Python venv and installs deps. Enrichment needs a local
+OpenAI-compatible LLM at `http://localhost:11500` (adjust `ENDPOINT`/`MODEL` in
+`enrich.py` / `band_enrich.py`). Schedule it with cron/launchd for periodic refreshes.
+
+Under the hood each stage is a standalone script — `scrape.py`, `enrich.py`,
+`band_enrich.py`, `embed.py` — that you can run on its own. All are **cached per tone,
+concurrent, and resumable**, so re-runs only do work for tones that are new.
 
 ## Run locally
 
