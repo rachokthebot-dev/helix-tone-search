@@ -1,0 +1,269 @@
+<title>Helix Tone Search - preview</title>
+<style>
+  :root{
+    --bg:#f4efe6; --panel:#fffdf9; --panel2:#faf5ec; --line:#e6dcca;
+    --text:#241e16; --muted:#8a7c68; --faint:#b6a88f;
+    --accent:#b3660f; --accent-hot:#8f4f08; --accent-soft:#f4e2c6; --accent-ink:#6e4207;
+    --chip-line:#e0d4bf;
+    --radius:13px; --maxw:1120px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#14100b; --panel:#1d1811; --panel2:#241e15; --line:#33291d;
+    --text:#f1e9dc; --muted:#a2917a; --faint:#6f6250;
+    --accent:#f0a63c; --accent-hot:#ffbe5c; --accent-soft:#2b2012; --accent-ink:#f6c885; --chip-line:#3b3020;
+  }}
+  :root[data-theme="light"]{
+    --bg:#f4efe6; --panel:#fffdf9; --panel2:#faf5ec; --line:#e6dcca;
+    --text:#241e16; --muted:#8a7c68; --faint:#b6a88f;
+    --accent:#b3660f; --accent-hot:#8f4f08; --accent-soft:#f4e2c6; --accent-ink:#6e4207; --chip-line:#e0d4bf;
+  }
+  :root[data-theme="dark"]{
+    --bg:#14100b; --panel:#1d1811; --panel2:#241e15; --line:#33291d;
+    --text:#f1e9dc; --muted:#a2917a; --faint:#6f6250;
+    --accent:#f0a63c; --accent-hot:#ffbe5c; --accent-soft:#2b2012; --accent-ink:#f6c885; --chip-line:#3b3020;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;}
+  a{color:inherit;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px;}
+
+  /* ---- hero ---- */
+  header{padding:48px 0 8px;}
+  .brandrow{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0;}
+  .eq{display:flex;align-items:flex-end;gap:2.5px;height:16px;}
+  .eq i{width:3px;background:var(--accent);border-radius:2px;height:30%;transform-origin:bottom;
+    animation:eq 1.1s ease-in-out infinite;}
+  .eq i:nth-child(2){animation-delay:.15s} .eq i:nth-child(3){animation-delay:.35s}
+  .eq i:nth-child(4){animation-delay:.5s} .eq i:nth-child(5){animation-delay:.22s}
+  @keyframes eq{0%,100%{height:22%}50%{height:100%}}
+
+  h1{margin:0;font-size:clamp(32px,5.5vw,50px);letter-spacing:-.028em;font-weight:800;line-height:1.0;text-wrap:balance;}
+  .lede{margin:14px 0 0;color:var(--muted);max-width:56ch;font-size:16px;}
+  .lede b{color:var(--accent);font-weight:600;}
+
+  .searchbar{margin-top:24px;position:relative;}
+  #q{width:100%;padding:17px 48px 17px 18px;font-size:17px;font-family:var(--sans);color:var(--text);
+    background:var(--panel);border:1.5px solid var(--line);border-radius:var(--radius);
+    transition:border-color .15s ease,box-shadow .15s ease;}
+  #q::placeholder{color:var(--faint);}
+  #q:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent);}
+  .glass{position:absolute;right:17px;top:50%;transform:translateY(-50%);width:16px;height:16px;
+    border:2px solid var(--faint);border-radius:50%;pointer-events:none;}
+  .glass::after{content:"";position:absolute;right:-5px;bottom:-4px;width:7px;height:2px;background:var(--faint);
+    transform:rotate(45deg);border-radius:2px;}
+
+  /* ---- intro (blank state) ---- */
+  #intro{padding:22px 0 60px;animation:fade .4s ease both;}
+  .prompt{font-family:var(--mono);font-size:12.5px;color:var(--faint);letter-spacing:.03em;margin:0 0 12px;}
+  .suggest{display:flex;flex-wrap:wrap;gap:9px;}
+  .sug{cursor:pointer;font-size:13.5px;padding:8px 14px;border-radius:999px;border:1px solid var(--chip-line);
+    background:var(--panel);color:var(--text);transition:transform .12s ease,border-color .12s ease,background .12s ease;}
+  .sug:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .sug.vibe{color:var(--accent-ink);background:var(--accent-soft);border-color:transparent;}
+  .sug .k{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em;margin-right:7px;}
+
+  /* ---- results view ---- */
+  #searchview[hidden]{display:none;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:18px 0 20px;border-bottom:1px solid var(--line);
+    animation:fade .3s ease both;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);}
+  select{appearance:none;font-family:var(--sans);font-size:13.5px;color:var(--text);background:var(--panel2);
+    border:1px solid var(--line);border-radius:9px;padding:8px 30px 8px 11px;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+  select:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .count{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .count b{color:var(--text);} .count .cband{color:var(--accent);}
+
+  main{padding:20px 0 70px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:15px;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px 15px;
+    display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden;
+    transition:border-color .15s ease,transform .15s ease;animation:rise .32s cubic-bezier(.2,.7,.3,1) both;}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .15s ease;}
+  .card:hover{border-color:var(--chip-line);transform:translateY(-2px);}
+  .card:hover::before{opacity:.9;}
+  .cardtop{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .device{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);
+    border:1px solid var(--chip-line);border-radius:6px;padding:2px 7px;white-space:nowrap;}
+  .dls{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .dls b{color:var(--text);}
+  .name{margin:0;font-size:16.5px;font-weight:700;letter-spacing:-.01em;line-height:1.2;}
+  .name a{text-decoration:none;}
+  .card:hover .name a{color:var(--accent);}
+  .band{font-size:13px;color:var(--accent);font-weight:600;}
+  .band .song{color:var(--muted);font-weight:400;}
+  .sub{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.02em;}
+  .desc{font-size:12.8px;color:var(--muted);margin:1px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:1px;}
+  .chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;border-radius:999px;padding:2px 9px;}
+  .chip.g{border:1px solid var(--chip-line);color:var(--muted);}
+  .chip.t{background:var(--accent-soft);color:var(--accent-ink);}
+  .foot{margin-top:auto;padding-top:11px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .open{font-size:12.5px;font-weight:600;text-decoration:none;color:var(--accent);display:inline-flex;align-items:center;gap:5px;}
+  .open:hover{color:var(--accent-hot);}
+  .match{font-family:var(--mono);font-size:10.5px;color:var(--faint);}
+  .match.band{color:var(--accent);font-weight:600;}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:48px 0;font-size:14px;}
+  .empty b{color:var(--text);}
+
+  .pagefoot{border-top:1px solid var(--line);padding:20px 0 48px;color:var(--faint);font-size:12.5px;line-height:1.6;max-width:72ch;}
+  .pagefoot b{color:var(--muted);font-weight:600;}
+
+  @keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brandrow">
+      <p class="eyebrow">Line 6 CustomTone</p>
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <h1>Helix Tone Search</h1>
+    <p class="lede">Find a preset by <b>band or song</b> first &mdash; then narrow by gear, genre, or feel.
+      Every result deep-links to CustomTone, where you log in to download.</p>
+    <div class="searchbar">
+      <input id="q" type="search" autocomplete="off" aria-label="Search tones">
+      <span class="glass" aria-hidden="true"></span>
+    </div>
+
+    <div id="intro">
+      <p class="prompt" id="prompt">Loading preview index...</p>
+      <div class="suggest" id="suggest"></div>
+    </div>
+  </header>
+
+  <section id="searchview" hidden>
+    <div class="controls">
+      <div class="field"><label for="sort">Sort</label>
+        <select id="sort"><option value="relevance">Relevance</option>
+          <option value="downloads">Most downloaded</option><option value="newest">Newest</option></select></div>
+      <div class="field"><label for="device">Device</label><select id="device"><option value="">Any</option></select></div>
+      <div class="field"><label for="genre">Genre</label><select id="genre"><option value="">Any</option></select></div>
+      <div class="field"><label for="mindl">Min downloads</label>
+        <select id="mindl"><option value="0">Any</option><option value="10">10+</option>
+          <option value="50">50+</option><option value="200">200+</option></select></div>
+      <span class="count" id="count"></span>
+    </div>
+    <main id="results"></main>
+  </section>
+
+  <div class="pagefoot">
+    <b>About this preview.</b> A curated slice of the crawl (recognizable bands + most-downloaded), filtered client-side.
+    The production tool indexes all <b id="total">2,928</b> tones and ranks your query by meaning with an in-browser
+    model &mdash; band and song matches always surface first &mdash; entirely serverless.
+  </div>
+</div>
+
+<script>
+const TONES = [{"name": "KL 12_STRING 3.5", "band": "Tom Petty, Rush, Led Zeppelin, Supertramp", "song": null, "author": "kevinlegault", "device": "Helix", "downloads": 1000, "date": "2022-12-09", "style": null, "genre_tags": ["rock", "pop rock"], "tone_tags": ["clean", "bright", "acoustic-sim"], "url": "https://line6.com/customtone/tone/5959274/", "description": "I have been looking for a 12-String sound for Free Fallin', Closer to the Heart, and Over the Hills and Far Away. I couldn't find one, so this is my second shot at it. This has bee"}, {"name": "Nirvana 1989?", "band": "Nirvana", "song": null, "author": "RankyRank", "device": "Helix Native", "downloads": 26, "date": "2026-01-13", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "grunge"], "tone_tags": ["clean", "crunch"], "url": "https://line6.com/customtone/tone/6739684/", "description": "Kind of sounds like kurt's guitar live in 89' Clean tone could be improved"}, {"name": "BAS:Liberator", "band": "Metallica", "song": "Enter Sandman", "author": "profgumby", "device": "Helix", "downloads": 26, "date": "2026-02-22", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["metal", "hard rock"], "tone_tags": ["high-gain", "distortion", "crunch"], "url": "https://line6.com/customtone/tone/6763616/", "description": "Good metallica tone"}, {"name": "RECTI HEADPHONES", "band": "Metallica, System of a Down, Megadeth, Slipknot, Ozzy Osbourne, Black Label Society", "song": "All", "author": "zippo2602", "device": "Helix LT", "downloads": 26, "date": "2026-01-16", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "grindcore", "black metal", "shred"], "tone_tags": ["high-gain", "distortion", "lead"], "url": "https://line6.com/customtone/tone/6741346/", "description": "Build with 150 Ohm Headphones, 4 Snapshots with all Important Effects"}, {"name": "Another Brick", "band": "PINK FLOYD", "song": "ANOTHER BRICK IN THE WALL", "author": "Stefer87", "device": "Helix LT", "downloads": 26, "date": "2026-04-06", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive rock", "classic rock"], "tone_tags": ["overdrive", "crunch", "delay"], "url": "https://line6.com/customtone/tone/6787521/", "description": "https://youtu.be/pFBhjH-GW4A"}, {"name": "Shine On You", "band": "Pink Floyd", "song": "Shine On You Crazy Diamond", "author": "ArlindPec", "device": "Helix LT", "downloads": 26, "date": "2026-03-10", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["clean", "lead", "phaser", "delay"], "url": "https://line6.com/customtone/tone/6773049/", "description": "This patch tries to emulate the guitar tone in the studio version of Shine On You Crazy Diamond. First snapshot is the clean into-mixer solo, second one is for Syd's theme, third o"}, {"name": "Marshall Crunch", "band": "AC/DC, GNR", "song": null, "author": "COBulldog", "device": "Helix LT", "downloads": 26, "date": "2026-07-10", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock"], "tone_tags": ["crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6834256/", "description": ""}, {"name": "Deftones Private", "band": "Deftones", "song": "private music", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "progressive"], "tone_tags": ["high-gain", "distortion"], "url": "https://line6.com/customtone/tone/6839754/", "description": "Deftones private music tone, Get the IRs here: https://drive.google.com/drive/folders/1XAZEzTdyCkjhml4EA-nsaCVWrtFertFX?usp=sharing"}, {"name": "Deftones Ohms", "band": "Deftones", "song": "Ohms", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "distortion", "heavy"], "url": "https://line6.com/customtone/tone/6839753/", "description": "Deftones Ohms tone, Get the IRs here: https://drive.google.com/drive/folders/1XAZEzTdyCkjhml4EA-nsaCVWrtFertFX?usp=sharing"}, {"name": "EVH 5150 GOJIRA", "band": "GOJIRA / THE EDIBLE TOADSTOOL ORCHESTRA", "song": null, "author": "BOLDRON", "device": "Helix", "downloads": 26, "date": "2026-02-25", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "grindcore", "black metal", "progressive metal"], "tone_tags": ["high-gain", "distortion", "crunch"], "url": "https://line6.com/customtone/tone/6765239/", "description": "Get this very organic metal tone (EVH 5150 style) ! https://tetoband.com/hairy-tales"}, {"name": "TOM MORELLO", "band": "Rage Against The Machine", "song": "Killing In the Name of, Bulls on Parade", "author": "DanMusicMan07", "device": "Helix Native", "downloads": 26, "date": "2026-05-25", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "alternative", "funk metal"], "tone_tags": ["high-gain", "crunch", "wah", "aggressive"], "url": "https://line6.com/customtone/tone/6812629/", "description": ""}, {"name": "RageMachine", "band": "Rage Against the Machine", "song": "Killing In The Name", "author": "profgumby", "device": "Helix", "downloads": 26, "date": "2026-02-22", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock", "funk metal"], "tone_tags": ["high-gain", "crunch", "aggressive"], "url": "https://line6.com/customtone/tone/6763598/", "description": "General tone for Rage"}, {"name": "Immigrant Zep", "band": "Led Zeppelin", "song": "Immigrant Song", "author": "johnnyvlee", "device": "Helix", "downloads": 26, "date": "2026-04-19", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock"], "tone_tags": ["crunch", "tremolo", "overdrive"], "url": "https://line6.com/customtone/tone/6794862/", "description": "Full credit to timeblock for his excellent patch. I modified it to (1) have Variax configured as Tele 1, (2) Added snapshot with Trem panned right and main panned left (listen to t"}, {"name": "Mercy OG", "band": "Muse", "song": "Mercy", "author": "MVergil", "device": "Helix LT", "downloads": 26, "date": "2026-07-16", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["crunch", "overdrive", "lead"], "url": "https://line6.com/customtone/tone/6836392/", "description": "Based on the live version of Mercy (Live Glastonbury 2016)"}, {"name": "Cryogen", "band": "Muse", "song": "Cryogen", "author": "MVergil", "device": "Helix LT", "downloads": 26, "date": "2026-06-16", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["crunch", "distortion", "lead"], "url": "https://line6.com/customtone/tone/6823152/", "description": "2 snapshots, main and refrain"}, {"name": "Gojira", "band": "Gojira", "song": null, "author": "sdfahgdsfgserter", "device": "Helix LT", "downloads": 26, "date": "2026-06-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "progressive metal"], "tone_tags": ["high-gain", "distortion"], "url": "https://line6.com/customtone/tone/6826311/", "description": ""}, {"name": "MAYER X-ARC", "band": "John Mayer", "song": null, "author": "srv35", "device": "Helix", "downloads": 26, "date": "2026-03-15", "style": "Blues (Chicago, Texas, etc.)", "genre_tags": ["blues"], "tone_tags": ["clean", "crunch", "edge-of-breakup"], "url": "https://line6.com/customtone/tone/6776410/", "description": "I think we all know about John Mayer's partnership with another amp modeling software. Archetype something or other X Mayer. Would be a shame if someone downloaded the trial and tr"}, {"name": "DIME DIS SOLO", "band": "PANTERA", "song": "PANTERA", "author": "germanansia", "device": "Helix LT", "downloads": 26, "date": "2026-05-08", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "shred"], "tone_tags": ["high-gain", "distortion", "lead"], "url": "https://line6.com/customtone/tone/6803709/", "description": ""}, {"name": "Piece of Mind", "band": "Iron Maiden", "song": "The Trooper, Revelations, Flight of Icarus", "author": "Popox", "device": "Helix LT", "downloads": 26, "date": "2026-04-12", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["heavy metal", "hard rock", "progressive rock"], "tone_tags": ["high-gain", "crunch", "lead"], "url": "https://line6.com/customtone/tone/6790544/", "description": "Trying to go for the maiden Piece of Mind Tone. I used the official celestion G12-65 IR (421+57), I think I got really close. My guitar has a seymour duncan JB on th bridge and Hot"}, {"name": "Up The Irons +DI", "band": "Iron Maiden", "song": "The Trooper", "author": "profgumby", "device": "Helix", "downloads": 26, "date": "2026-02-22", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["heavy metal", "hard rock"], "tone_tags": ["high-gain", "distortion", "crunch"], "url": "https://line6.com/customtone/tone/6763605/", "description": ""}, {"name": "GIG PATCH 2026", "band": "Black Sabbath", "song": "Rock songs", "author": "ADproject", "device": "Helix", "downloads": 26, "date": "2026-06-20", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock", "progressive rock"], "tone_tags": ["crunch", "overdrive", "distortion"], "url": "https://line6.com/customtone/tone/6825274/", "description": "snap shots"}, {"name": "Coldrain ykc", "band": "coldrain", "song": null, "author": "ryopan", "device": "Helix", "downloads": 26, "date": "2026-07-26", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "alternative"], "tone_tags": ["high-gain", "distortion"], "url": "https://line6.com/customtone/tone/6840723/", "description": ""}, {"name": "Discipline", "band": "King Crimson", "song": "Elephant Talk", "author": "JakobLangenohl", "device": "Helix", "downloads": 26, "date": "2026-07-25", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["progressive", "rock"], "tone_tags": ["crunch", "mid-gain", "bright"], "url": "https://line6.com/customtone/tone/6840263/", "description": "As heard on https://youtu.be/qTDk1l3c-S0"}, {"name": "Arpeggiator", "band": "The Technique", "song": null, "author": "JakobLangenohl", "device": "Helix", "downloads": 26, "date": "2026-07-25", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["clean", "delay", "modulation"], "url": "https://line6.com/customtone/tone/6840262/", "description": "As seen on https://youtu.be/z-2OzKvQ9hU"}, {"name": "Deftones Gore", "band": "Deftones", "song": "Gore", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "progressive"], "tone_tags": ["high-gain", "distortion"], "url": "https://line6.com/customtone/tone/6839752/", "description": "Deftones Gore tone, Get the IRs here: https://drive.google.com/drive/folders/1XAZEzTdyCkjhml4EA-nsaCVWrtFertFX?usp=sharing"}, {"name": "Deftones Koi", "band": "Deftones", "song": "Koi No Yokan", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "progressive"], "tone_tags": ["high-gain", "distortion", "reverb"], "url": "https://line6.com/customtone/tone/6839748/", "description": "Deftones Koi no Yokan tone, I used a ESP LTD Stephen carpenter signature 8 string for most of this preset and a Gibson SG for Chinos Presets. In the bypass mode for chinos preset, "}, {"name": "Deftones Diamond", "band": "Deftones", "song": "Diamond Eyes", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "chorus", "delay", "clean", "distortion"], "url": "https://line6.com/customtone/tone/6839741/", "description": "Deftones Diamond Eyes tone, I Used a 8 string Stephen carpenter signature guitar for most of the presets and a Gibson SG for Chino Morenos preset. I control chinos preset through t"}, {"name": "Deftones SNW", "band": "Deftones", "song": "Saturday Night Wrist", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "heavy", "distorted"], "url": "https://line6.com/customtone/tone/6839740/", "description": "Deftones Saturday Night Wrist tone, I used a 7 string tuned to Drop A and i pitch shift it down to drop F#. For Chinos guitar parts, I control all his guitar tones through his pres"}, {"name": "Deftones ST", "band": "Deftones", "song": "Deftones", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "heavy", "distorted"], "url": "https://line6.com/customtone/tone/6839739/", "description": "Deftones Self Titled tone, I use a 7 string tuned to standard and use the pitch shifter to drop it down to G# Standard. For the Minerva preset, i use a 6 string tuned down to drop "}, {"name": "Deftones WP", "band": "Deftones", "song": "White Pony", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "distortion", "pitch-shifted"], "url": "https://line6.com/customtone/tone/6839738/", "description": "Deftones White Pony tone, Tuned to drop D With pitch shifter transposed to drop C, I use my JB duncan bridge pickup for most of the presets except for Digital and Change where i us"}, {"name": "Deftones ATF", "band": "Deftones", "song": "Around the Fur", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "heavy", "crunch"], "url": "https://line6.com/customtone/tone/6839737/", "description": "Deftones Around the Fur tone, Recorded with a Gibson SG with a JB Duncan bridge. I tune my guitar to drop D and then use the pitch shifter to go to drop C# But remove that if youd "}, {"name": "Deftones Adren", "band": "Deftones", "song": "Adrenaline", "author": "Preadi1", "device": "Helix LT", "downloads": 26, "date": "2026-07-23", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "alternative metal"], "tone_tags": ["high-gain", "distortion"], "url": "https://line6.com/customtone/tone/6839736/", "description": "Deftones adrenaline tone. Used a Gibson SG with a JB duncan to make this tone.  Get the IRS here: https://drive.google.com/drive/folders/1XAZEzTdyCkjhml4EA-nsaCVWrtFertFX?usp=shari"}, {"name": "Monark aktuell", "band": "Monark", "song": null, "author": "Olov-Harald", "device": "Helix LT", "downloads": 26, "date": "2026-07-20", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock", "progressive rock"], "tone_tags": ["crunch", "overdrive", "mid-gain"], "url": "https://line6.com/customtone/tone/6838249/", "description": ""}, {"name": "Apogeo Set", "band": null, "song": null, "author": "christhian", "device": "Helix LT", "downloads": 26, "date": "2026-07-20", "style": "Pop", "genre_tags": ["pop"], "tone_tags": ["clean", "bright"], "url": "https://line6.com/customtone/tone/6838239/", "description": ""}, {"name": "HIW TELCSTR Eb", "band": null, "song": null, "author": "christhian", "device": "Helix LT", "downloads": 26, "date": "2026-07-20", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock"], "tone_tags": ["crunch", "overdrive", "bright"], "url": "https://line6.com/customtone/tone/6838238/", "description": ""}, {"name": "HIW TELCSTR", "band": null, "song": null, "author": "christhian", "device": "Helix LT", "downloads": 26, "date": "2026-07-20", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock"], "tone_tags": ["crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6838237/", "description": ""}, {"name": "MD AC30", "band": null, "song": null, "author": "mystrodiaz", "device": "Helix LT", "downloads": 26, "date": "2026-07-18", "style": "Praise/Worship", "genre_tags": ["worship", "rock"], "tone_tags": ["clean", "edge-of-breakup", "chimey"], "url": "https://line6.com/customtone/tone/6837620/", "description": "I use this preset when playing with other bands to blend in"}, {"name": "MD WRSP whowatt", "band": "Unchained", "song": null, "author": "mystrodiaz", "device": "Helix LT", "downloads": 26, "date": "2026-07-18", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock"], "tone_tags": ["high-gain", "crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6837618/", "description": "used on more aggressive praise and worship"}, {"name": "MD Match&Vox", "band": "Unchained", "song": null, "author": "mystrodiaz", "device": "Helix LT", "downloads": 26, "date": "2026-07-18", "style": "Praise/Worship", "genre_tags": ["praise", "worship"], "tone_tags": ["lead", "rhythm", "solo"], "url": "https://line6.com/customtone/tone/6837611/", "description": "This is my live preset for lead,rythm and solo"}, {"name": "Greta Van Fleet", "band": "Greta Van Fleet", "song": null, "author": "jf1297", "device": "Helix LT", "downloads": 26, "date": "2026-07-14", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock", "progressive rock"], "tone_tags": ["wah", "octave", "crunch"], "url": "https://line6.com/customtone/tone/6835580/", "description": "Re-created his custom stereo wah, added POG style octave for songs like Built By Nations"}, {"name": "Violin", "band": "The Technique", "song": null, "author": "JakobLangenohl", "device": "Helix", "downloads": 26, "date": "2026-07-14", "style": "Jazz/Fusion", "genre_tags": ["jazz", "fusion"], "tone_tags": ["clean", "reverb", "ambient"], "url": "https://line6.com/customtone/tone/6835546/", "description": "You will need these two IR to run this preset properly: https://www.angelofarina.it/Public/IMP-RESP/Violins/LANGHOF.WAV and https://www.angelofarina.it/Public/IMP-RESP/Violins/VIOL"}, {"name": "TL ED1 Live", "band": "x", "song": "x", "author": "EDINESTULIMA1", "device": "Helix", "downloads": 26, "date": "2026-07-09", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock", "progressive rock"], "tone_tags": ["crunch", "overdrive", "lead"], "url": "https://line6.com/customtone/tone/6833988/", "description": ""}, {"name": "NEXTPRESETB", "band": "Elevation", "song": null, "author": "Indianrock2020", "device": "Helix Native", "downloads": 26, "date": "2026-07-09", "style": "Praise/Worship", "genre_tags": ["praise", "worship"], "tone_tags": ["clean", "ambient", "delay", "reverb"], "url": "https://line6.com/customtone/tone/6833748/", "description": "My latest preset draft"}, {"name": "DREAMING AWAKE BASS", "band": "Set to Spiral", "song": "Dreaming Awake", "author": "Bassbice", "device": "Helix", "downloads": 26, "date": "2026-07-08", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["overdriven", "bass"], "url": "https://line6.com/customtone/tone/6833677/", "description": "https://www.youtube.com/watch?v=Oic6b0xya9k"}, {"name": "GenXRock", "band": "NA", "song": "NA", "author": "Rockett5150", "device": "Helix", "downloads": 26, "date": "2026-07-07", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "classic rock", "hard rock"], "tone_tags": ["crunch", "overdrive", "modulation"], "url": "https://line6.com/customtone/tone/6833050/", "description": "A general rock tone starting with the plexi, added in some TS, Kinky and EQ for tone shaping.  Phase 90 and Poly Detune for taste.  A good rock tone...be sure to adjust to your ear"}, {"name": "Nirvana - CAYA B", "band": "Nirvana", "song": "Come as you are", "author": "OoBatouoO", "device": "Helix LT", "downloads": 25, "date": "2025-10-21", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "grunge"], "tone_tags": ["chorus", "clean", "crunch"], "url": "https://line6.com/customtone/tone/6692424/", "description": "Full song cover here : https://www.youtube.com/watch?v=6xObJwKLRi8"}, {"name": "AC/DC", "band": "AC/DC", "song": null, "author": "christhian", "device": "Helix LT", "downloads": 25, "date": "2025-12-28", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock"], "tone_tags": ["crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6729822/", "description": "THE SOUND WAS CREATED ON A TELECASTER GUITAR CONNECTED VIA XLR LINE OUT TO AN AUDIO INTERFACE."}, {"name": "Tool - 4 Degrees", "band": "Tool", "song": "4 Degrees", "author": "Pinkflydxx", "device": "Helix LT", "downloads": 25, "date": "2025-12-12", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["acoustic", "crunch", "chorus"], "url": "https://line6.com/customtone/tone/6720417/", "description": "While I think this is a decent starting point, more experienced Helix programmers can probably \"dress it up\" with adjustments to make it even better.  Please note that I used an ac"}, {"name": "Everlong", "band": "Foo Fighters", "song": "Test", "author": "JonnyCool", "device": "Helix", "downloads": 25, "date": "2025-12-18", "style": "Pop", "genre_tags": ["rock", "alternative"], "tone_tags": ["overdrive", "crunch", "distortion"], "url": "https://line6.com/customtone/tone/6723471/", "description": ""}, {"name": "My Sky", "band": "Foo Fighters", "song": "Sky is a neighborhood", "author": "ASambrook", "device": "Helix LT", "downloads": 25, "date": "2025-07-29", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "alternative"], "tone_tags": ["crunch", "overdrive", "lead"], "url": "https://line6.com/customtone/tone/6648173/", "description": "Based on Youtube videos of rig rundowns from PG"}, {"name": "Black Cats 2", "band": "David Gilmour", "song": null, "author": "baffino", "device": "Helix Rack", "downloads": 25, "date": "2025-06-08", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "progressive"], "tone_tags": ["overdrive", "delay", "reverb"], "url": "https://line6.com/customtone/tone/6622816/", "description": ""}, {"name": "Gates intro", "band": "Pantera", "song": "Cemetery Gates", "author": "densetoaster23", "device": "Helix LT", "downloads": 25, "date": "2025-07-14", "style": "Metal (Grindcore, Black, Power, Progressive) / Shred", "genre_tags": ["metal", "progressive metal"], "tone_tags": ["high-gain", "distortion", "lead"], "url": "https://line6.com/customtone/tone/6640887/", "description": ""}, {"name": "TG NI Black", "band": "Black Sabbath", "song": "N I B", "author": "tonegarageuk", "device": "Helix Native", "downloads": 25, "date": "2025-04-25", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock", "heavy metal"], "tone_tags": ["crunch", "distortion", "heavy"], "url": "https://line6.com/customtone/tone/6600333/", "description": "like this? check out my Helix tone shop, brilliant prices! https://tonegarage.co.uk/line-6-helix-patches/"}, {"name": "INTRANOVA (Ibanz", "band": "SU AMNESIA, LINKIN PARK, AUDIOSLAVE, ROCK NACIONAL ARGENTINA", "song": "LIKE A STONE, ROCK NACIONAL, LINKIN PARK, PU\u00c3\u0083\u00c2\u0083\u00c3\u0082\u00c2\u0083\u00c3\u0083\u00c2\u0082\u00c3\u0082\u00c2\u0091ALES", "author": "fedesuamnesia", "device": "Helix", "downloads": 25, "date": "2025-09-14", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock", "progressive rock"], "tone_tags": ["crunch", "overdrive", "lead"], "url": "https://line6.com/customtone/tone/6673489/", "description": ""}, {"name": "Jellybelly", "band": "Smashing Pumpkins", "song": "Jellybelly", "author": "JiD77", "device": "Helix", "downloads": 25, "date": "2025-10-18", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "alternative"], "tone_tags": ["crunch", "distortion", "lead", "overdrive"], "url": "https://line6.com/customtone/tone/6690526/", "description": "Preset for. the song Jellybelly by Smashing Pumpkins. Three presets - Preset 1 for Rhythm, Preset 2 for lead harmonies, Preset 3 for solo. Video of me using the preset over a backi"}, {"name": "WHTSNME Jazz", "band": "Knuckle Puck, Taking Back Sunday, Green Day, Blink 182, etc.", "song": "IDK", "author": "aldienB", "device": "Helix LT", "downloads": 24, "date": "2024-12-13", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["pop punk", "emo"], "tone_tags": ["crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6515034/", "description": "This sound is perfect for Emo Pop Punk like Knuckle Puck. But it also works with every other Pop Punk genre. Just tweak a lil' if you need and your good to go."}, {"name": "Guns 2024", "band": "guns n roses, slash, velvet revolver", "song": "welcome to the jungle, stranged, november rain etc.", "author": "fedesuamnesia", "device": "Helix", "downloads": 24, "date": "2024-07-29", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock"], "tone_tags": ["crunch", "overdrive", "lead"], "url": "https://line6.com/customtone/tone/6426587/", "description": "Hice el tono exacto a criterio de oido y analizar los instrumentos perfectamente de las grabaciones de slash cualquier consuta mi instagram es  @fedesuamnesia ,soy de la republica "}, {"name": "Morello 2.0", "band": "Rage Against The Machine, Audioslave", "song": null, "author": "MarciShaggy", "device": "Helix Native", "downloads": 24, "date": "2024-09-22", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "hard rock", "alternative"], "tone_tags": ["crunch", "overdrive", "mid-gain"], "url": "https://line6.com/customtone/tone/6462406/", "description": "The foundation of tom morello's Marshall tone, enjoy :)"}, {"name": "Today", "band": "Smashing Pumpkins", "song": "Today", "author": "clfnole123", "device": "Helix", "downloads": 24, "date": "2024-06-25", "style": "Rock (Classic, Hard, Progressive)", "genre_tags": ["rock", "alternative"], "tone_tags": ["clean", "fuzz", "crunch"], "url": "https://line6.com/customtone/tone/6404519/", "description": "4 Snapshots: 1) Clean Intro 2) Fuzz 3) Clean Verse 4) Outro - Brit 2203 + Fender Champ for Intro only.  Made with Fender Telecaster in stereo with 2 Headrush 108 speakers.  At home"}, {"name": "Dookie", "band": "Green Day", "song": "Basket Case", "author": "JiD77", "device": "Helix", "downloads": 23, "date": "2023-02-26", "style": "Rock", "genre_tags": ["rock", "punk"], "tone_tags": ["crunch", "overdrive"], "url": "https://line6.com/customtone/tone/6026609/", "description": "Preset for guitar tones from Dookie. I based it on using an Epiphone LP but pretty much anything with a humbucker in the bridge should get close. Video of me using the preset over "}, {"name": "LDR Stereo", "band": "Slipknot / Laberinto De Reyes", "song": "2004 up to date", "author": "Icaro_CR", "device": "Helix", "downloads": 23, "date": "2023-04-01", "style": "Metal", "genre_tags": ["metal"], "tone_tags": ["high-gain", "stereo", "distortion", "delay"], "url": "https://line6.com/customtone/tone/6057597/", "description": "***Re-Upload****This is my stereo preset I use for my band Laberinto De Reyes (https://www.youtube.com/@laberintodereyes4148). It is based on my Amplitube 5 preset intended to emul"}, {"name": "PF John Mayer", "band": "John Mayer / John Mayer Trio", "song": "Various", "author": "njkleist", "device": "Helix", "downloads": 22, "date": "2022-01-18", "style": null, "genre_tags": ["blues", "pop", "soft rock"], "tone_tags": ["clean", "reverb", "compression", "edge-of-breakup"], "url": "https://line6.com/customtone/tone/5680189/", "description": ""}, {"name": "Simply Weeps", "band": "The Beatles", "song": "While My Guitar Gently Weeps", "author": "johnnyrauker", "device": "Helix", "downloads": 22, "date": "2022-02-22", "style": "Classic Rock", "genre_tags": ["classic rock"], "tone_tags": ["crunch", "reverb", "modulation"], "url": "https://line6.com/customtone/tone/5715339/", "description": "Hooray for the ADT in 3.15! This preset is a simple, one path approach. FS1 is a boost into the amp, FS2 is Verb bypass, FS3 is the ADT effect bypass."}, {"name": "GGD Archetype", "band": "Periphery", "song": "Blood Eagle", "author": "Dhermic_Luciano", "device": "Helix LT", "downloads": 21, "date": "2021-06-04", "style": "Djent, Modern metal, backing tracks suitable", "genre_tags": ["djent", "modern metal"], "tone_tags": ["high-gain", "clean", "ambient", "lead"], "url": "https://line6.com/customtone/tone/5457902/", "description": "Tone based on Neural DSP Archetype Nolly VST (blood eagle preset).\n\n4 Snapshots: 1- Rythm, 2- Clean, 3- Ambient (shimmer), 4- Lead //   \n\nPath 2 to connect backing tracks (return 1"}, {"name": "STAR SPANGLED JH", "band": "Jimi Hendrix", "song": "The Star Spangled Banner", "author": "ctruxall0284", "device": "Helix", "downloads": 21, "date": "2021-12-18", "style": "Psychedelic Rock", "genre_tags": ["psychedelic rock"], "tone_tags": ["fuzz", "wah", "reverb", "feedback"], "url": "https://line6.com/customtone/tone/5650128/", "description": "Originally I used this built this tone through my HX Effects to match Jimi's Woodstock sound as close as I could get for an outdoor city fourth of July Fair (you can listen here: h"}, {"name": "WOODSTOCK", "band": "Jimi Hendrix", "song": "N/A", "author": "FoxATBT", "device": "Helix", "downloads": 21, "date": "2021-02-20", "style": "Rock", "genre_tags": ["rock", "blues"], "tone_tags": ["fuzz", "crunch", "vibrato"], "url": "https://line6.com/customtone/tone/5344226/", "description": "Went for Jimi's blazing and raw sound. Fuzzy, vibed out Marshall cranked to 10 with two 4x12s and classic ribbon mics set about 4\" back. Cleans up great around 5 on the volume pot."}, {"name": "David Gilmour", "band": "Pink Floyd", "song": "David Gilmour's Signal Chain Effects Order. This should cover all songs of the Floyd.", "author": "Scorpio2112", "device": "Helix LT", "downloads": 21, "date": "2021-09-11", "style": "Rock", "genre_tags": ["rock", "progressive rock"], "tone_tags": ["fuzz", "chorus", "delay", "reverb", "modulation"], "url": "https://line6.com/customtone/tone/5555105/", "description": "I felt inspired to make a David Gilmour patch that followed his actual signal chain. All set to stereo. 2014 Stratocaster > Red Squeeze > Triangle Fuzz > Gray Flanger > Script Mod "}, {"name": "HofnerBacker", "band": "The Beatles", "song": null, "author": "johnnyrauker", "device": "Helix", "downloads": 21, "date": "2021-04-22", "style": null, "genre_tags": ["rock", "pop"], "tone_tags": ["clean", "vintage"], "url": "https://line6.com/customtone/tone/5414484/", "description": ""}, {"name": "UnderTB Fabio", "band": "Red Hot Chili Peppers RHCP", "song": "Under The Bridge", "author": "fgrossi", "device": "Helix", "downloads": 20, "date": "2020-07-20", "style": "Funky Rock", "genre_tags": ["funk", "rock"], "tone_tags": ["clean", "compressed"], "url": "https://line6.com/customtone/tone/5077146/", "description": "Main U.t.B. preset (verse/chorus only) created by comparing the Helix output vs the original isolated track. made by Ibanez JEM7V neck PU split, so please adjust amp drive to your "}, {"name": "Zsolt Bass Hori", "band": "Periphery", "song": "Absolomb", "author": "Bameska", "device": "Helix Rack", "downloads": 20, "date": "2020-12-16", "style": "Djent/Metal/Progressive", "genre_tags": ["djent", "metal", "progressive"], "tone_tags": ["high-gain", "distorted", "aggressive"], "url": "https://line6.com/customtone/tone/5255753/", "description": "Check the tone:\nhttps://www.youtube.com/watch?v=iGewbzJ27VQ\n\nI made a wall-fucking-breaking bass sound for Djent/Metal.\n\nOf course, the sound can differ by different pick ups and g"}, {"name": "Dani California", "band": "Red Hot Chili Peppers", "song": "Dani California", "author": "johnsherlock", "device": "Helix", "downloads": 18, "date": "2018-05-11", "style": "Alternative Rock", "genre_tags": ["alternative rock", "funk rock"], "tone_tags": ["crunch", "overdrive", "bright"], "url": "https://line6.com/customtone/tone/3836344/", "description": "I have a very specific workflow for my Helix. My patches are all designed to be used in eight-snapshot mode. Further, my output signal path splits in two to allow me to go direct t"}, {"name": "Idioteque", "band": "Radiohead", "song": "Idioteque", "author": "burningyen", "device": "Helix", "downloads": 18, "date": "2018-05-09", "style": "Synth rock", "genre_tags": ["synth rock", "electronic"], "tone_tags": ["clean", "ambient", "synth-like"], "url": "https://line6.com/customtone/tone/3832487/", "description": "This uses the Helix's generators to recreate the samples of Paul Lansky's 1973 electronic piece mild und leise which Radiohead used in the song Idioteque. Demo at youtube.com/watch"}, {"name": "RH SubTerAlien", "band": "Radiohead", "song": "Subterranean Homesick Alien", "author": "jonesy60", "device": "Helix LT", "downloads": 18, "date": "2018-12-26", "style": "Alt Rock", "genre_tags": ["alt rock"], "tone_tags": ["octave pitch shift", "rhythm", "lead"], "url": "https://line6.com/customtone/tone/4186374/", "description": "This patch was influenced by Radiohead's Subterranean Homesick Alien. There are 3 snapshots. Intro rhythm, Alien and Misc/Rhythm. The Alien snap enlists the expression pedal for th"}];
+const REAL_TOTAL = 2928;
+const $ = s => document.querySelector(s);
+const results=$('#results'), countEl=$('#count'), intro=$('#intro'), view=$('#searchview');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// facets
+for(const d of [...new Set(TONES.map(t=>t.device).filter(Boolean))].sort()) $('#device').add(new Option(d,d));
+for(const g of [...new Set(TONES.flatMap(t=>t.genre_tags||[]))].sort()) $('#genre').add(new Option(g,g));
+
+// suggestion chips = clean canonical band names present in the data + vibe queries
+const CANON=[['Nirvana','nirvana'],['Green Day','green day'],['Metallica','metallica'],
+  ['Pink Floyd','pink floyd'],['Deftones','deftones'],['AC/DC','ac/dc'],['Tool','tool'],['Led Zeppelin','led zeppelin']];
+const present=k=>TONES.some(x=>((x.band||'')+' '+(x.song||'')).toLowerCase().includes(k));
+const wantBands=CANON.filter(([,k])=>present(k)).slice(0,6);
+const vibes=['ambient clean delay','high-gain metal','blues lead'];
+$('#suggest').innerHTML =
+  wantBands.map(([label,key])=>`<button class="sug" data-q="${key}"><span class="k">band</span>${label}</button>`).join('')
+  + vibes.map(v=>`<button class="sug vibe" data-q="${v}"><span class="k">vibe</span>${v}</button>`).join('');
+$('#suggest').addEventListener('click',e=>{const b=e.target.closest('.sug'); if(!b)return;
+  const q=$('#q'); q.value=b.dataset.q; stopTyping(); render(); q.focus();});
+$('#prompt').textContent = `Start typing a band or song \u2014 or try one of these (${TONES.length} in this preview)`;
+
+// ---- typewriter placeholder (idle only) ----
+const EXAMPLES=['nirvana','green day','david gilmour','metallica enter sandman','ambient clean delay','pink floyd'];
+let tw={i:0,j:0,del:false,timer:null};
+function typeStep(){
+  const word=EXAMPLES[tw.i%EXAMPLES.length];
+  tw.j += tw.del?-1:1;
+  $('#q').setAttribute('placeholder','Search  '+word.slice(0,tw.j)+'\u2589');
+  let d=tw.del?45:90;
+  if(!tw.del && tw.j===word.length){tw.del=true; d=1300;}
+  else if(tw.del && tw.j===0){tw.del=false; tw.i++; d=350;}
+  tw.timer=setTimeout(typeStep,d);
+}
+function stopTyping(){ if(tw.timer){clearTimeout(tw.timer);tw.timer=null;} $('#q').setAttribute('placeholder','Search by band, song, or vibe'); }
+function startTyping(){ if(reduce||tw.timer||$('#q').value)return; tw={i:0,j:0,del:false,timer:null}; typeStep(); }
+
+// ---- search ----
+function haystack(t){return [t.name,t.band,t.song,t.author,t.style,(t.genre_tags||[]).join(' '),(t.tone_tags||[]).join(' '),t.description].filter(Boolean).join(' ').toLowerCase();}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function score(t,terms){const h=haystack(t);let s=0;for(const w of terms){if(!h.includes(w))return -1;
+  if((t.name||'').toLowerCase().includes(w))s+=3; if((t.band||'').toLowerCase().includes(w))s+=3;
+  if((t.song||'').toLowerCase().includes(w))s+=2; if((t.tone_tags||[]).some(x=>x.includes(w)))s+=2; s+=1;}return s;}
+
+function render(){
+  const query=$('#q').value.trim().toLowerCase();
+  const terms=query?query.split(/\s+/):[];
+  if(!terms.length){ view.hidden=true; intro.style.display=''; startTyping(); return; }
+  intro.style.display='none'; view.hidden=false; stopTyping();
+
+  const dev=$('#device').value, gen=$('#genre').value, min=+$('#mindl').value, sort=$('#sort').value;
+  const bandsong=t=>((t.band||'')+' '+(t.song||'')).toLowerCase();
+  let items=TONES.map(t=>({t,s:score(t,terms),band:terms.every(w=>bandsong(t).includes(w))}))
+    .filter(x=>x.s>=0)
+    .filter(x=>(!dev||x.t.device===dev)&&(!gen||(x.t.genre_tags||[]).includes(gen))&&(x.t.downloads||0)>=min);
+
+  if(sort==='downloads') items.sort((a,b)=>(b.t.downloads||0)-(a.t.downloads||0));
+  else if(sort==='newest') items.sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||''));
+  else { items.sort((a,b)=>(b.band-a.band)||(b.s-a.s)||((b.t.downloads||0)-(a.t.downloads||0)));
+    const hits=items.filter(x=>x.band).sort((a,b)=>(b.t.downloads||0)-(a.t.downloads||0));
+    items=[...hits,...items.filter(x=>!x.band)]; }
+
+  const bandHits=items.filter(x=>x.band).length;
+  countEl.innerHTML=`<b>${items.length}</b> result${items.length===1?'':'s'}`+(bandHits?` <span class="cband">&middot; ${bandHits} by band/song</span>`:'');
+  results.innerHTML=items.length?items.map((x,i)=>card(x.t,x.s,x.band,i)).join('')
+    :`<div class="empty"><b>No matches for &ldquo;${esc(query)}&rdquo;.</b><br>This preview holds only ${TONES.length} tones &mdash; the full index has ${REAL_TOTAL.toLocaleString()}.</div>`;
+}
+
+function card(t,s,bandMatch,idx){
+  const bl=t.band?`<div class="band">${esc(t.band)}${t.song?` <span class="song">&mdash; ${esc(t.song)}</span>`:''}</div>`:'';
+  const chips=[...(t.genre_tags||[]).slice(0,3).map(g=>`<span class="chip g">${esc(g)}</span>`),
+    ...(t.tone_tags||[]).slice(0,4).map(x=>`<span class="chip t">${esc(x)}</span>`)].join('');
+  const delay=Math.min(idx,12)*28;
+  return `<article class="card" style="animation-delay:${delay}ms">
+    <div class="cardtop"><span class="device">${esc(t.device||'Helix')}</span>
+      <span class="dls"><b>${(t.downloads||0).toLocaleString()}</b> dl</span></div>
+    <h3 class="name"><a href="${t.url||'#'}" target="_blank" rel="noopener">${esc(t.name||'Untitled')}</a></h3>${bl}
+    <div class="sub">${[t.author?'by '+esc(t.author):'',t.date?esc(t.date):''].filter(Boolean).join('  &middot;  ')}</div>
+    ${t.description?`<p class="desc">${esc(t.description)}</p>`:''}
+    ${chips?`<div class="chips">${chips}</div>`:''}
+    <div class="foot"><a class="open" href="${t.url||'#'}" target="_blank" rel="noopener">Open on CustomTone &rarr;</a>
+      ${bandMatch?`<span class="match band">band/song match</span>`:(s>0?`<span class="match">match ${s}</span>`:'')}</div>
+  </article>`;
+}
+
+// ---- persist filter/sort settings across sessions (localStorage) ----
+const LS_KEY='helix.searchSettings';
+const CTRLS=['sort','device','genre','mindl'];
+function saveSettings(){ try{ localStorage.setItem(LS_KEY,
+  JSON.stringify(Object.fromEntries(CTRLS.map(id=>[id,$('#'+id).value])))); }catch(e){} }
+function loadSettings(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+  for(const id of CTRLS){ const el=$('#'+id);
+    if(s[id]!=null && [...el.options].some(o=>o.value===s[id])) el.value=s[id]; } }catch(e){} }
+
+let deb; $('#q').addEventListener('input',()=>{clearTimeout(deb);deb=setTimeout(render,120);});
+$('#q').addEventListener('focus',stopTyping);
+$('#q').addEventListener('blur',()=>{if(!$('#q').value)startTyping();});
+for(const id of CTRLS) $('#'+id).addEventListener('change',()=>{saveSettings();render();});
+$('#total').textContent = REAL_TOTAL.toLocaleString();
+loadSettings();    // restore the visitor's saved filters/sort before first paint
+render();          // starts blank (no query) -> intro + typewriter
+</script>

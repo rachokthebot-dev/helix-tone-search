@@ -1,0 +1,5 @@
+indexer/.venv/
+indexer/cache/
+__pycache__/
+.playwright-mcp/
+*.pyc
