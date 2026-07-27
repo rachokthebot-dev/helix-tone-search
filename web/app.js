@@ -20,11 +20,14 @@ async function boot() {
   presets.forEach((r, i) => (r._i = i));
 
   mini = new MiniSearch({
-    fields: ['name', 'band', 'song', 'artist', 'style', 'description', 'genreStr', 'toneStr'],
+    fields: ['name', 'band', 'song', 'artist', 'style', 'description', 'genreStr', 'toneStr', 'bandExtra'],
     storeFields: ['_i'], idField: 'id',
-    searchOptions: { prefix: true, fuzzy: 0.2, boost: { name: 3, band: 3, song: 3, artist: 2 } },
+    searchOptions: { prefix: true, fuzzy: 0.2, boost: { name: 3, band: 3, song: 3, artist: 2, bandExtra: 3 } },
   });
-  mini.addAll(presets.map(r => ({ ...r, genreStr: (r.genre_tags || []).join(' '), toneStr: (r.tone_tags || []).join(' ') })));
+  mini.addAll(presets.map(r => ({ ...r,
+    genreStr: (r.genre_tags || []).join(' '), toneStr: (r.tone_tags || []).join(' '),
+    bandExtra: [r.band_norm, r.band_inferred, r.song_inferred, ...(r.bands || []), ...(r.aliases || [])].filter(Boolean).join(' '),
+  })));
 
   buildFacets();
   loadSettings();
@@ -37,7 +40,11 @@ async function boot() {
 
 function buildFacets() {
   for (const d of [...new Set(presets.map(r => r.device).filter(Boolean))].sort()) $('device').add(new Option(d, d));
-  for (const g of [...new Set(presets.flatMap(r => r.genre_tags || []))].sort()) $('genre').add(new Option(g, g));
+  // 200+ raw genres is unusable — show only common ones, most-frequent first
+  const gcount = {};
+  presets.forEach(r => (r.genre_tags || []).forEach(g => (gcount[g] = (gcount[g] || 0) + 1)));
+  const genres = Object.entries(gcount).filter(([, c]) => c >= 10).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+  for (const g of genres) $('genre').add(new Option(g, g));
 }
 
 // ---- typewriter placeholder (idle only) ----
@@ -87,7 +94,8 @@ function passes(r) {
   const dev = $('device').value, gen = $('genre').value, min = +$('mindl').value;
   return (!dev || r.device === dev) && (!gen || (r.genre_tags || []).includes(gen)) && (r.downloads || 0) >= min;
 }
-const isBandMatch = r => { const bs = ((r.band || '') + ' ' + (r.song || '')).toLowerCase(); return queryTerms.length && queryTerms.every(w => bs.includes(w)); };
+const bandBlob = r => [r.band, r.song, r.band_norm, r.band_inferred, r.song_inferred, ...(r.bands || []), ...(r.aliases || [])].filter(Boolean).join(' ').toLowerCase();
+const isBandMatch = r => queryTerms.length && queryTerms.every(w => bandBlob(r).includes(w));
 
 function rankItems(ranked, sort) {
   let items = ranked.map(([i, s]) => ({ row: presets[i], score: s })).filter(x => passes(x.row));
@@ -124,7 +132,10 @@ function paint(items) {
     : `<div class="empty"><b>No matches.</b> Try a broader query or clear the filters.</div>`;
 }
 function card(r, score, idx) {
-  const bl = r.band ? `<div class="band">${esc(r.band)}${r.song ? ` <span class="song">— ${esc(r.song)}</span>` : ''}</div>` : '';
+  const bandName = r.band_norm || r.band || r.band_inferred;
+  const songName = r.song || r.song_inferred;
+  const guessed = !r.band && r.band_inferred;
+  const bl = bandName ? `<div class="band">${esc(bandName)}${guessed ? ` <span class="song" title="inferred from the preset name">· guessed</span>` : ''}${songName ? ` <span class="song">— ${esc(songName)}</span>` : ''}</div>` : '';
   const chips = [...(r.genre_tags || []).slice(0, 3).map(g => `<span class="chip g">${esc(g)}</span>`),
     ...(r.tone_tags || []).slice(0, 4).map(t => `<span class="chip t">${esc(t)}</span>`)].join('');
   const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
