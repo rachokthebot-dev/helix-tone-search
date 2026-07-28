@@ -58,6 +58,25 @@ Both are **concurrent, cached per tone (so re-runs only touch new tones), and re
 All of these feed the browser search index (so `GNR`, `Guns N Roses`, and multi-band presets
 all match), the embedding text, the color-coded genre families, and the genre facet.
 
+## Search & UI
+
+- **Band / song / artist first.** Exact band, song, or guitarist matches float to the top
+  (grouped by downloads), ahead of everything else — the primary use case. Normalized band
+  fields mean `GNR`, `Guns N' Roses`, multi-band presets, and description-mentioned bands
+  all resolve.
+- **Hybrid ranking.** In-browser semantic embeddings (transformers.js) fused with a
+  MiniSearch keyword index via Reciprocal Rank Fusion. Literal matches show first; a
+  labelled **"Related tones"** divider separates the semantic tail so weaker neighbours
+  aren't mistaken for real hits.
+- **No-match is explicit.** A query with no literal match reads **"0 matches · N similar"**
+  with a banner — never a silent list of neighbours presented as results.
+- **Structured filters & chips.** Device / Genre / Feature / min-downloads facets;
+  genre-family **colour-coded** card stripes; **gear** shown as click-to-filter chips; a
+  *"General-purpose preset"* label for tones with no band/song. Filter/sort selections
+  persist in `localStorage`.
+- **Search-first blank screen** with a cycling typewriter of example queries. Every result
+  deep-links to CustomTone; presets are never hosted here.
+
 ## What CustomTone's browse actually exposes
 
 Reverse-engineered constraints that shape the crawler:
