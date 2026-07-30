@@ -2,8 +2,8 @@
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "browser_model": "Xenova/all-MiniLM-L6-v2",
   "dims": 384,
-  "count": 2928,
+  "count": 8917,
   "quant": "int8",
   "scale": 127,
-  "built_at": "2026-07-27T08:02:34.624854+00:00"
+  "built_at": "2026-07-30T02:07:26.294272+00:00"
 }

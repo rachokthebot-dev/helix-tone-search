@@ -32,21 +32,36 @@ if [ ! -x .venv/bin/python ]; then
 fi
 PY=.venv/bin/python
 SORTS="posted thecount rating name band song guitarist amp style"
+# Each sort's listing hard-caps at ~50 pages, so we union both directions: desc
+# captures the top ~1,000 tones, asc the bottom ~1,000 — disjoint on a ~10k catalog.
+DIRS="desc asc"
 
-echo "[update] 1/4 scrape (union of all sort fields)"
-for s in $SORTS; do
-  if [ "$FULL" = "1" ]; then
-    "$PY" scrape.py --sort "$s" --max-pages 60 --delay 10 --restart
-  else
-    "$PY" scrape.py --sort "$s" --max-pages 60 --delay 10 --restart --stop-on-seen
-  fi
+echo "[update] 1/4 scrape (union of all sort fields x directions)"
+for d in $DIRS; do
+  for s in $SORTS; do
+    if [ "$FULL" = "1" ]; then
+      "$PY" scrape.py --sort "$s" --dir "$d" --max-pages 60 --delay 10 --restart
+    else
+      "$PY" scrape.py --sort "$s" --dir "$d" --max-pages 60 --delay 10 --restart --stop-on-seen
+    fi
+  done
 done
 
-echo "[update] 2/4 enrich genre/tone tags (cached — only new tones hit the LLM)"
-"$PY" enrich.py --tags-only --workers 8
+# Deepen bands we already know via the (uncapped, Helix-scoped) search endpoint.
+# Only on --full: it searches ~1k bands at the 10s crawl-delay (hours), too slow to
+# run on every incremental refresh.
+if [ "$FULL" = "1" ]; then
+  echo "[update] 2/4 backfill known bands (Helix-only search endpoint)"
+  "$PY" backfill_bands.py --delay 10
+else
+  echo "[update] 2/4 backfill skipped (only runs on --full)"
+fi
 
-echo "[update] 3/4 band/song normalization (cached — only new tones hit the LLM)"
-"$PY" band_enrich.py --workers 8
+echo "[update] 3/4 enrich tags + band metadata in ONE LLM pass (rule fast-path + cached; only new tones hit the LLM)"
+# Merged single-pass enricher: ~2x fewer LLM calls than the old enrich.py + band_enrich.py
+# two-pass flow, plus a rule-based fast-path that skips the LLM for no-description tones with a
+# mappable style. workers=4 matches the single-slot start-gemma-mtp.sh server.
+"$PY" enrich_all.py --workers 4
 
 echo "[update] 4/4 embed -> web/data"
 "$PY" embed.py --in cache/enriched.jsonl
