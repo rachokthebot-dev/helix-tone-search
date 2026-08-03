@@ -39,7 +39,7 @@ function renderBuildInfo() {
   if (meta.count) bits.push(`${meta.count.toLocaleString()} tones`);
   // Counts arrive progressively as the backfill runs; say so rather than let
   // "— dl" rows read as missing data.
-  if (meta.downloads_unknown) bits.push(`${meta.downloads_unknown.toLocaleString()} awaiting download counts`);
+  if (meta.downloads_unknown) bits.push(`<span class="pending">${meta.downloads_unknown.toLocaleString()} awaiting download counts</span>`);
   el.innerHTML = bits.join(' &middot; ');
 }
 
