@@ -166,6 +166,17 @@ def fetch_search_page(session: requests.Session, term: str, page: int) -> list[d
     return out
 
 
+CANARY = "metallica"  # the most-covered band on CustomTone; a real 0 here means throttled
+
+
+def fetch_search_page_safe(session: requests.Session, term: str) -> bool:
+    """True if the endpoint is actually serving results right now."""
+    try:
+        return bool(fetch_search_page(session, term, 1))
+    except Exception:
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="cache/raw.jsonl")
@@ -176,6 +187,12 @@ def main():
     ap.add_argument("--stop-empty", type=int, default=2,
                     help="stop a band after N consecutive pages with zero new tones (the loose-match tail)")
     ap.add_argument("--limit", type=int, default=0, help="0 = all bands; else only the first N pending")
+    ap.add_argument("--zero-streak", type=int, default=12,
+                    help="consecutive empty bands before suspecting a throttle")
+    ap.add_argument("--throttle-wait", type=float, default=900.0,
+                    help="seconds to wait between canary probes when throttled")
+    ap.add_argument("--throttle-tries", type=int, default=8,
+                    help="canary probes before giving up and stopping cleanly")
     ap.add_argument("--restart", action="store_true", help="ignore saved progress and re-search every band")
     args = ap.parse_args()
 
@@ -202,8 +219,11 @@ def main():
     session.headers.update(scrape.HEADERS)
 
     added = 0
+    zero_streak = 0        # consecutive bands that yielded nothing at all
+    recent_zero: list = []  # their keys, so a throttle can un-mark them
     for i, (key, disp) in enumerate(todo, 1):
         empty_streak = 0
+        got_any = False
         for page in range(1, args.max_pages + 1):
             try:
                 tones = fetch_search_page(session, disp, page)
@@ -216,6 +236,7 @@ def main():
                 break
             if not tones:
                 break
+            got_any = True
             new_here = 0
             for t in tones:
                 if t["id"] not in known:
@@ -231,6 +252,44 @@ def main():
             if empty_streak >= args.stop_empty:
                 break
         done.add(key)
+
+        # line6.com throttles sustained crawling by returning HTTP 200 with an
+        # EMPTY result set — never a 429. A band that yields nothing is then
+        # indistinguishable from a band that genuinely has nothing, and since we
+        # just marked it done it would never be retried. So: watch for a run of
+        # empty bands, and confirm against a query that is never legitimately
+        # empty before believing them.
+        if got_any:
+            zero_streak = 0
+            recent_zero.clear()
+        else:
+            zero_streak += 1
+            recent_zero.append(key)
+
+        if zero_streak >= args.zero_streak:
+            for attempt in range(1, args.throttle_tries + 1):
+                if fetch_search_page_safe(session, CANARY):
+                    print(f"[backfill] canary recovered — resuming", file=sys.stderr)
+                    break
+                # Un-mark the suspect bands so a later pass re-searches them,
+                # and persist that immediately: a kill here must not leave them
+                # recorded as searched.
+                for k in recent_zero:
+                    done.discard(k)
+                scrape.flush(known, out)
+                state_path.write_text(json.dumps({"done": sorted(done)}))
+                print(f"[backfill] THROTTLED ({zero_streak} empty bands, canary "
+                      f"'{CANARY}' also empty) — un-marked {len(recent_zero)}, "
+                      f"waiting {args.throttle_wait}s [{attempt}/{args.throttle_tries}]",
+                      file=sys.stderr)
+                time.sleep(args.throttle_wait)
+            else:
+                print("[backfill] still throttled after all retries — stopping cleanly. "
+                      "Re-run later; state has the un-marked bands pending.", file=sys.stderr)
+                break
+            zero_streak = 0
+            recent_zero.clear()
+
         if i % 10 == 0:
             scrape.flush(known, out)
             state_path.write_text(json.dumps({"done": sorted(done)}))

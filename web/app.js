@@ -52,6 +52,10 @@ async function boot() {
   loadSettings();
   statusEl.classList.remove('loading');
   statusEl.innerHTML = `<span class="dot"></span>${presets.length.toLocaleString()} tones indexed · search by band, song, or vibe`;
+  // Deep link, e.g. from the Setlists wizard: ?q=Seether Veruca Salt
+  const deepLink = new URLSearchParams(location.search).get('q');
+  if (deepLink) $('q').value = deepLink;
+
   wire();
   startTyping();
   render();
@@ -214,7 +218,7 @@ function card(r, score, idx) {
   const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
   return `<article class="card" style="--stripe:${family(r).color};animation-delay:${delay}ms">
     <div class="cardtop"><span class="device">${esc(r.device || 'Helix')}</span>
-      <span class="dls"><b>${(r.downloads || 0).toLocaleString()}</b> dl</span></div>
+      <span class="dls">${r.downloads == null ? '<b>—</b> dl' : `<b>${r.downloads.toLocaleString()}</b> dl`}</span></div>
     <h3 class="name"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.name || 'Untitled')}</a></h3>${bl}
     ${also.length ? `<div class="sub">also: ${also.map(esc).join(', ')}</div>` : ''}
     <div class="sub">${[r.author ? 'by ' + esc(r.author) : '', r.date ? esc(r.date) : ''].filter(Boolean).join('  ·  ')}</div>

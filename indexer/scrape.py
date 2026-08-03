@@ -20,7 +20,11 @@ from bs4 import BeautifulSoup
 
 BASE = "https://line6.com/customtone/browse/helix/{page}/?sort={sort}&sort_dir={dir}&search_term="
 TONE_ID_RE = re.compile(r"/customtone/tone/(\d+)/")
-DOWNLOADS_RE = re.compile(r"(\d[\d,]*)\s+downloads?", re.I)
+# Plural only, and never straight after a date. The count is rendered as
+# "<a>Download</a> 2616 downloads" in its own div, and the date div sits
+# immediately before it — so an optional "s" made "12/9/22 Download" match
+# first and every tone got its upload year as its download count.
+DOWNLOADS_RE = re.compile(r"(?<!/)\b(\d[\d,]*)\s+downloads\b", re.I)
 DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{2})")
 STAR_RE = re.compile(r"star_(\d)")
 LABELS = {"BAND": "band", "SONG": "song", "GUITARIST": "guitarist",
@@ -72,7 +76,10 @@ def parse_tone(tone) -> dict | None:
     style_candidates = []
     if details:
         for li in details.find_all("li"):
-            txt = li.get_text(" ", strip=True)
+            # Collapse internal newlines: get_text() keeps them inside a single
+            # text node, and "." never matches "\n", so a wrapped value made the
+            # label regex fail and the li was dropped field-and-all.
+            txt = " ".join(li.get_text(" ", strip=True).split())
             if not txt:
                 continue
             m = re.match(r"^([A-Z][A-Z ]+):\s*(.*)$", txt)
@@ -90,7 +97,12 @@ def parse_tone(tone) -> dict | None:
     date_el = tone.find("div", class_="date")
     rec["date"] = parse_date(date_el.get_text(" ", strip=True) if date_el else tone.get_text(" ", strip=True))
 
-    m = DOWNLOADS_RE.search(tone.get_text(" ", strip=True))
+    # Read it out of the div that holds the Download button, not the whole
+    # block: anchoring to the element is what stops a neighbouring number
+    # (the date, a rating, anything added later) from being picked up instead.
+    dl_icon = tone.find("span", class_="glyphicon-download")
+    dl_scope = dl_icon.find_parent("div") if dl_icon else None
+    m = DOWNLOADS_RE.search((dl_scope or tone).get_text(" ", strip=True))
     if m:
         digits = m.group(1).replace(",", "")
         if digits.isdigit():
@@ -106,11 +118,8 @@ def parse_tone(tone) -> dict | None:
     return rec
 
 
-def fetch_page(session: requests.Session, page: int, sort: str, direction: str) -> list[dict]:
-    url = BASE.format(page=page, sort=sort, dir=direction)
-    resp = session.get(url, timeout=30)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "lxml")
+def parse_listing(html: str, url: str) -> list[dict]:
+    soup = BeautifulSoup(html, "lxml")
     out = []
     for t in soup.find_all("div", class_="tone"):
         try:
@@ -121,6 +130,41 @@ def fetch_page(session: requests.Session, page: int, sort: str, direction: str) 
         if r:
             out.append(r)
     return out
+
+
+def fetch_page(session: requests.Session, page: int, sort: str, direction: str,
+               attempts: int = 3, backoff: float = 15.0) -> list[dict]:
+    """Fetch one listing page, retrying blanks and network blips.
+
+    line6.com intermittently answers a perfectly good URL with HTTP 200 and zero
+    .tone blocks, and occasionally just times out. Both are indistinguishable
+    from the real end-of-window (the listing caps at ~page 50), and the caller
+    stops the whole sort window on an empty result — so a single blip silently
+    truncates ~500 tones. Retry before believing a page is genuinely empty.
+    """
+    url = BASE.format(page=page, sort=sort, dir=direction)
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        try:
+            resp = session.get(url, timeout=30)
+            resp.raise_for_status()
+        except requests.HTTPError:
+            raise  # a real 404/500 is meaningful — let the caller stop
+        except requests.RequestException as e:
+            last_err = e
+            print(f"[scrape] {url} attempt {attempt}/{attempts}: {e}", file=sys.stderr)
+        else:
+            last_err = None
+            tones = parse_listing(resp.text, url)
+            if tones:
+                return tones
+            print(f"[scrape] {url} attempt {attempt}/{attempts}: 200 but 0 tones",
+                  file=sys.stderr)
+        if attempt < attempts:
+            time.sleep(backoff * attempt)
+    if last_err is not None:
+        raise last_err
+    return []  # consistently empty across retries -> genuinely the end of this window
 
 
 def main():
@@ -166,6 +210,12 @@ def main():
             tones = fetch_page(session, page, args.sort, args.dir)
         except requests.HTTPError as e:
             print(f"[scrape] page {page} HTTP {e.response.status_code}, stopping", file=sys.stderr)
+            break
+        except requests.RequestException as e:
+            # Out of retries. Stop this window rather than killing the run — the
+            # checkpoint below keeps what we have, and resume picks it up later.
+            print(f"[scrape] page {page} network error after retries ({e}), stopping window",
+                  file=sys.stderr)
             break
         if not tones:
             print(f"[scrape] page {page} empty, stopping", file=sys.stderr)
