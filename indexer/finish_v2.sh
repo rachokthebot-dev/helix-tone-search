@@ -75,20 +75,25 @@ done
 echo "[finish] embed ($(date +%H:%M:%S))"
 "$PY" embed.py --in "$ENR"
 
-echo "[finish] verify"
+echo "[finish] verify (reports the MERGED index — i.e. what actually got embedded)"
 "$PY" - <<'EOF'
 import json
-new = [json.loads(l) for l in open('cache/raw_v2.jsonl') if l.strip()]
-old = {json.loads(l)['id']: json.loads(l) for l in open('cache/raw.jsonl.bak-20260802') if l.strip()}
-dls = [r['downloads'] for r in new]
-bad = sum(1 for r in new if r['date'] and r['downloads'] == int(r['date'][2:4]))
+# Must read the merged file, not raw_v2: raw_v2 is only the re-crawled subset,
+# so reporting it makes the index look like it shrank against the old catalog.
+new = [json.loads(l) for l in open('cache/raw_merged.jsonl') if l.strip()]
+old = {json.loads(l)['id'] for l in open('cache/raw.jsonl.bak-20260802') if l.strip()}
+known = [r['downloads'] for r in new if r['downloads'] is not None]
+bad = sum(1 for r in new
+          if r['downloads'] is not None and r['date'] and r['downloads'] == int(r['date'][2:4]))
 newids = {r['id'] for r in new}
-print(f"  tones:            {len(new)}   (was {len(old)})")
-print(f"  distinct dl vals: {len(set(dls))}   (was 14)")
-print(f"  dl range:         {min(dls)}–{max(dls)}")
-print(f"  dl == own year:   {bad}")
+print(f"  tones (deployed): {len(new)}   (was {len(old)})")
+print(f"  real counts:      {len(known)}")
+print(f"  unknown (— dl):   {len(new) - len(known)}   flagged needs_recrawl")
+print(f"  distinct dl vals: {len(set(known))}   (was 14)")
+print(f"  dl range:         {min(known)}–{max(known)}")
+print(f"  dl == own year:   {bad}   (coincidence rate, not a failure)")
 print(f"  missing name:     {sum(1 for r in new if not r['name'])}   (was 60)")
-print(f"  dropped vs old:   {len(set(old) - newids)}")
-print(f"  newly found:      {len(newids - set(old))}")
+print(f"  dropped vs old:   {len(old - newids)}   (must be 0)")
+print(f"  newly found:      {len(newids - old)}")
 EOF
 echo "[finish] done $(date) — NOT deployed; review, then push web/data to go live"
