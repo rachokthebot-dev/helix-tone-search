@@ -2,8 +2,11 @@
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "browser_model": "Xenova/all-MiniLM-L6-v2",
   "dims": 384,
-  "count": 9217,
+  "count": 9457,
   "quant": "int8",
   "scale": 127,
-  "built_at": "2026-08-03T15:31:40.466838+00:00"
+  "built_at": "2026-08-03T20:43:23.418351+00:00",
+  "version": "2026.08.03-2043",
+  "downloads_known": 8844,
+  "downloads_unknown": 613
 }
