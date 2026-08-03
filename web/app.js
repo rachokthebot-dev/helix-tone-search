@@ -26,6 +26,23 @@ function family(r) {
   return FAMILIES.find(f => f.kw.some(k => tags.includes(k))) || OTHER;
 }
 
+function renderBuildInfo() {
+  const el = $('buildinfo');
+  if (!el || !meta) return;
+  const bits = [];
+  if (meta.version) bits.push(`Index <b>v${meta.version}</b>`);
+  if (meta.built_at) {
+    const d = new Date(meta.built_at);
+    if (!isNaN(d)) bits.push(`updated ${d.toLocaleString(undefined,
+      { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+  }
+  if (meta.count) bits.push(`${meta.count.toLocaleString()} tones`);
+  // Counts arrive progressively as the backfill runs; say so rather than let
+  // "— dl" rows read as missing data.
+  if (meta.downloads_unknown) bits.push(`${meta.downloads_unknown.toLocaleString()} awaiting download counts`);
+  el.innerHTML = bits.join(' &middot; ');
+}
+
 async function boot() {
   const [m, p, vb] = await Promise.all([
     fetch('data/meta.json').then(r => r.json()),
@@ -34,6 +51,7 @@ async function boot() {
   ]);
   meta = m; presets = p; vectors = new Int8Array(vb);
   presets.forEach((r, i) => (r._i = i));
+  renderBuildInfo();
 
   mini = new MiniSearch({
     fields: ['name', 'band', 'song', 'artist', 'style', 'genreStr', 'toneStr', 'bandExtra', 'gearStr', 'featStr'],

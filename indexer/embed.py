@@ -74,6 +74,11 @@ def main():
     presets = [{k: r.get(k) for k in DISPLAY_FIELDS} for r in rows]
     (outdir / "presets.json").write_text(json.dumps(presets, ensure_ascii=False))
 
+    built = datetime.now(timezone.utc)
+    # Download counts land progressively as the band backfill advances, so publish
+    # the coverage alongside the build stamp — "how complete is this index" is the
+    # question a version number alone can't answer.
+    known = sum(1 for r in rows if r.get("downloads") is not None)
     meta = {
         "model": MODEL,
         "browser_model": BROWSER_MODEL,
@@ -81,7 +86,10 @@ def main():
         "count": len(rows),
         "quant": "int8",
         "scale": 127,
-        "built_at": datetime.now(timezone.utc).isoformat(),
+        "built_at": built.isoformat(),
+        "version": built.strftime("%Y.%m.%d-%H%M"),
+        "downloads_known": known,
+        "downloads_unknown": len(rows) - known,
     }
     (outdir / "meta.json").write_text(json.dumps(meta, indent=2))
 
