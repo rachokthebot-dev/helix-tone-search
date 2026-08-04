@@ -26,6 +26,20 @@ function family(r) {
   return FAMILIES.find(f => f.kw.some(k => tags.includes(k))) || OTHER;
 }
 
+// Sorted download counts, so a raw number can be expressed as "top N%" — 320 dl
+// means nothing on its own, but "top 12%" tells you where it sits in the catalog.
+let dlSorted = [], irHidden = 0, totalMatched = 0;
+function buildDlIndex() {
+  dlSorted = presets.map(r => r.downloads).filter(d => d != null).sort((a, b) => a - b);
+}
+function dlRank(n) {
+  if (n == null || !dlSorted.length) return null;
+  let lo = 0, hi = dlSorted.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; dlSorted[m] < n ? lo = m + 1 : hi = m; }
+  const pct = Math.round((1 - lo / dlSorted.length) * 100);
+  return pct <= 25 ? `top ${Math.max(pct, 1)}%` : null;  // "top 50%" says nothing; only flag standouts
+}
+
 function renderBuildInfo() {
   const el = $('buildinfo');
   if (!el || !meta) return;
@@ -52,6 +66,7 @@ async function boot() {
   meta = m; presets = p; vectors = new Int8Array(vb);
   presets.forEach((r, i) => (r._i = i));
   renderBuildInfo();
+  buildDlIndex();
 
   mini = new MiniSearch({
     fields: ['name', 'band', 'song', 'artist', 'style', 'genreStr', 'toneStr', 'bandExtra', 'gearStr', 'featStr'],
@@ -147,6 +162,14 @@ function rrf(lex, sem) {
 
 // ---- filters / ranking ----
 function passes(r) {
+  // Presets built around third-party IRs don't sound right without buying/downloading
+  // them, so they're out by default. The result count says how many are hidden.
+  if (r.needs_ir && !$('showir').checked) return false;
+  return passesExceptIR(r);
+}
+// Same predicate minus the IR rule, so the count of hidden IR presets reflects the
+// other active filters instead of the whole catalog.
+function passesExceptIR(r) {
   const dev = $('device').value, gen = $('genre').value, min = +$('mindl').value, feat = $('feature').value;
   if (dev && r.device !== dev) return false;
   if (gen && !(r.genre_tags || []).includes(gen)) return false;
@@ -158,27 +181,73 @@ function passes(r) {
 const bandBlob = r => [r.band, r.song, r.artist, r.band_norm, r.band_inferred, r.song_inferred,
   ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || [])]
   .filter(Boolean).join(' ').toLowerCase();
-const isBandMatch = r => queryTerms.length && queryTerms.every(w => bandBlob(r).includes(w));
+const isBandMatch = r => contentTerms().length && contentTerms().every(w => bandBlob(r).includes(w));
+// The preset's OWN band/song/artist attribution, excluding descriptions that merely
+// mention other acts — this is what separates "is this tone" from "talks about it".
+const ownBandBlob = r => [r.band, r.song, r.artist, r.band_norm, r.band_inferred, r.song_inferred,
+  ...(r.bands || []), ...(r.aliases || [])].filter(Boolean).join(' ').toLowerCase();
+const isOwnBandMatch = r => contentTerms().length && contentTerms().every(w => ownBandBlob(r).includes(w));
+// How many acts the preset claims for itself — the enriched `bands` list when present,
+// otherwise the raw band field split on its separators.
+const ownBandCount = r => ((r.bands && r.bands.length)
+  ? r.bands
+  : String(r.band || '').split(/[,;/]|\band\b/).map(s => s.trim()).filter(Boolean)).length;
 // a "real" match = every query term appears literally somewhere (not fuzzy) — used to tell
 // genuine hits apart from the semantic tail and to detect no-match queries.
 const searchText = r => [r.name, r.band, r.song, r.artist, r.style, r.band_norm, r.band_inferred, r.song_inferred,
   ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || []),
   ...(r.genre_tags || []), ...(r.tone_tags || []), ...(r.gear || []), ...(r.features || [])]
   .filter(Boolean).join(' ').toLowerCase();
-const isRealMatch = r => queryTerms.length && queryTerms.every(w => searchText(r).includes(w));
+// Stopwords never appear in preset metadata, so requiring them made "praise and
+// worship electric" report zero matches over a screen of correct worship presets.
+const STOPWORDS = new Set(['and', 'the', 'a', 'an', 'of', 'for', 'in', 'on', 'with', 'to', 'or', 'by']);
+const contentTerms = () => queryTerms.filter(w => !STOPWORDS.has(w));
+const isRealMatch = r => {
+  const terms = contentTerms();
+  if (!terms.length) return false;
+  const txt = searchText(r);
+  if (terms.every(w => txt.includes(w))) return true;
+  // A band/song hit settles it even when the descriptive half of the query ("drop
+  // tuning") exists in no field — those results are real matches, not "similar".
+  const own = ownBandBlob(r);
+  return terms.some(w => w.length >= 3 && own.includes(w));
+};
 
 function rankItems(ranked, sort) {
-  let items = ranked.map(([i, s]) => ({ row: presets[i], score: s, i })).filter(x => passes(x.row));
+  const all = ranked.map(([i, s]) => ({ row: presets[i], score: s, i }));
+  // Scope the tally to genuine matches for this query. The semantic pass scores the
+  // whole catalog, so counting every candidate just reports the global IR total no
+  // matter what was typed.
+  irHidden = $('showir').checked ? 0
+    : all.filter(x => x.row.needs_ir && passesExceptIR(x.row)
+                 && (!queryTerms.length || isRealMatch(x.row))).length;
+  let items = all.filter(x => passes(x.row));
   if (sort === 'downloads') { items.sort((a, b) => b.row.downloads - a.row.downloads); return items.slice(0, MAX_RESULTS); }
   if (sort === 'newest') { items.sort((a, b) => (b.row.date || '').localeCompare(a.row.date || '')); return items.slice(0, MAX_RESULTS); }
   if (!queryTerms.length) return items.slice(0, MAX_RESULTS);
   // relevance: band/song matches (by downloads), then other literal matches, then a labelled
   // "related" tail of semantic neighbours that didn't literally match the query.
-  const band = items.filter(x => isBandMatch(x.row)).sort((a, b) => b.row.downloads - a.row.downloads);
+  // Two tiers, because a preset that IS a band's tone should beat one that merely
+  // name-drops the band in its description. Flat-pooling them let a 40k-download
+  // generalist mentioning "AC/DC" outrank the actual AC/DC preset.
+  const byDl = (a, b) => (b.row.downloads || 0) - (a.row.downloads || 0);
+  // Within the primary tier, a preset attributed to one or two acts is "the tone for
+  // X"; one claiming eleven is a do-everything patch. Focused ones lead, each group
+  // still ordered by downloads.
+  const own = items.filter(x => isBandMatch(x.row) && isOwnBandMatch(x.row));
+  const focused = own.filter(x => ownBandCount(x.row) <= 2).sort(byDl);
+  const broad = own.filter(x => ownBandCount(x.row) > 2).sort(byDl);
+  const primary = [...focused, ...broad];
+  const primarySet = new Set(primary.map(x => x.i));
+  const secondary = items.filter(x => !primarySet.has(x.i) && isBandMatch(x.row)).sort(byDl);
+  const band = [...primary, ...secondary];
   const bandSet = new Set(band.map(x => x.i));
   const other = items.filter(x => !bandSet.has(x.i) && isRealMatch(x.row));
   const related = items.filter(x => !bandSet.has(x.i) && !isRealMatch(x.row));
   related.forEach(x => (x.related = true));
+  // The displayed list is capped at MAX_RESULTS, so item counts alone always read
+  // "60 results" no matter how broad or narrow the query was. Keep the real total.
+  totalMatched = band.length + other.length;
   return [...band, ...other, ...related].slice(0, MAX_RESULTS);
 }
 
@@ -201,10 +270,17 @@ function paint(items) {
   const q = $('q').value.trim();
   const hasMatches = items.some(x => !x.related);
   const bandHits = items.filter(x => isBandMatch(x.row)).length;
-  countEl.innerHTML = (q && items.length && !hasMatches)
+  // Say how many the IR filter is holding back — a default-on filter that silently
+  // shrinks the catalog is worse than no filter.
+  const irNote = irHidden ? ` <button class="irtoggle" id="irtoggle">· ${irHidden} IR preset${irHidden === 1 ? '' : 's'} hidden</button>` : '';
+  const shown = items.filter(x => !x.related).length;
+  countEl.innerHTML = ((q && items.length && !hasMatches)
     ? `<b>0</b> matches <span class="cband">· ${items.length} similar</span>`
-    : `<b>${items.length}</b> result${items.length === 1 ? '' : 's'}` +
-      (bandHits ? ` <span class="cband">· ${bandHits} by band/song</span>` : '');
+    : `<b>${totalMatched.toLocaleString()}</b> result${totalMatched === 1 ? '' : 's'}` +
+      (totalMatched > shown ? ` <span class="cband">· showing ${shown}</span>` : '') +
+      (bandHits ? ` <span class="cband">· ${bandHits} by band/song</span>` : '')) + irNote;
+  const tog = $('irtoggle');
+  if (tog) tog.onclick = () => { $('showir').checked = true; render(); };
   if (!items.length) {
     resultsEl.innerHTML = `<div class="empty"><b>No matches.</b> Try a broader query or clear the filters.</div>`;
     return;
@@ -234,12 +310,19 @@ function card(r, score, idx) {
   const gearChips = (r.gear || []).slice(0, 4)
     .map(g => `<span class="chip gear" data-gear="${esc(g)}" title="Filter by ${esc(g)}">${esc(g)}</span>`).join('');
   const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
+  const rank = dlRank(r.downloads);
+  // Presets that cover a whole set are what "full gig" style queries are after,
+  // but nothing on the card said so.
+  const songCount = new Set((r.mentioned_songs || []).map(s => s.toLowerCase())).size;
+  const setlist = songCount >= 2 ? `<span class="setlist">covers ${songCount} songs</span>` : '';
   return `<article class="card" style="--stripe:${family(r).color};animation-delay:${delay}ms">
     <div class="cardtop"><span class="device">${esc(r.device || 'Helix')}</span>
-      <span class="dls">${r.downloads == null ? '<b>—</b> dl' : `<b>${r.downloads.toLocaleString()}</b> dl`}</span></div>
+      ${r.snapshots != null ? `<span class="snapflag" title="${r.snapshots ? `The author describes ${r.snapshots} snapshots` : 'Uses snapshots — the author didn\'t say how many'}">${r.snapshots || ''}${r.snapshots ? ' ' : ''}snapshot${r.snapshots === 1 ? '' : 's'}</span>` : ''}
+      ${r.needs_ir ? `<span class="irflag" title="Built around third-party impulse responses — you need those IR files for it to sound as intended">needs IR</span>` : ''}
+      <span class="dls">${r.downloads == null ? '<b>—</b> dl' : `<b>${r.downloads.toLocaleString()}</b> dl${rank ? ` <i>${rank}</i>` : ''}`}</span></div>
     <h3 class="name"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.name || 'Untitled')}</a></h3>${bl}
     ${also.length ? `<div class="sub">also: ${also.map(esc).join(', ')}</div>` : ''}
-    <div class="sub">${[r.author ? 'by ' + esc(r.author) : '', r.date ? esc(r.date) : ''].filter(Boolean).join('  ·  ')}</div>
+    <div class="sub">${[r.author ? 'by ' + esc(r.author) : '', r.date ? esc(r.date) : ''].filter(Boolean).join('  ·  ')}${setlist ? '  ·  ' + setlist : ''}</div>
     ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
     ${chips ? `<div class="chips">${chips}</div>` : ''}
     ${gearChips ? `<div class="chips gearrow">${gearChips}</div>` : ''}
@@ -249,10 +332,18 @@ function card(r, score, idx) {
 }
 
 // ---- persist settings ----
-function saveSettings() { try { localStorage.setItem(LS_KEY, JSON.stringify(Object.fromEntries(CTRLS.map(id => [id, $(id).value])))); } catch (e) {} }
+// showir is a checkbox, so it round-trips through .checked rather than .value.
+function saveSettings() {
+  try {
+    const s = Object.fromEntries(CTRLS.map(id => [id, $(id).value]));
+    s.showir = $('showir').checked;
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
 function loadSettings() {
   try { const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
     for (const id of CTRLS) { const el = $(id); if (s[id] != null && [...el.options].some(o => o.value === s[id])) el.value = s[id]; }
+    if (typeof s.showir === 'boolean') $('showir').checked = s.showir;
   } catch (e) {}
 }
 
@@ -267,7 +358,7 @@ function wire() {
   $('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(render, 130); });
   $('q').addEventListener('focus', stopTyping);
   $('q').addEventListener('blur', () => { if (!$('q').value) startTyping(); });
-  for (const id of CTRLS) $(id).addEventListener('change', () => { saveSettings(); render(); });
+  for (const id of [...CTRLS, 'showir']) $(id).addEventListener('change', () => { saveSettings(); render(); });
   // click a gear chip on any card to filter by that gear; click the pill to clear
   resultsEl.addEventListener('click', e => {
     const g = e.target.closest('.chip.gear');
