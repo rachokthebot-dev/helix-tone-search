@@ -51,9 +51,6 @@ function renderBuildInfo() {
       { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
   }
   if (meta.count) bits.push(`${meta.count.toLocaleString()} tones`);
-  // Counts arrive progressively as the backfill runs; say so rather than let
-  // "— dl" rows read as missing data.
-  if (meta.downloads_unknown) bits.push(`<span class="pending">${meta.downloads_unknown.toLocaleString()} awaiting download counts</span>`);
   el.innerHTML = bits.join(' &middot; ');
 }
 

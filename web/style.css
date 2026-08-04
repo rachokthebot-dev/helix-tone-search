@@ -132,7 +132,6 @@
   .irtoggle:hover{color:var(--accent);}
   .buildinfo{font-family:var(--mono);font-size:12px;color:var(--muted);margin:7px 0 0;}
   .buildinfo b{color:var(--accent);font-weight:600;}
-  .buildinfo .pending{color:var(--text);}
   .status{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:14px 0 0;display:flex;gap:9px;align-items:center;}
   .status .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;}
   .status.loading .dot{animation:pulse 1s ease-in-out infinite;}
