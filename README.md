@@ -16,7 +16,7 @@ Covers **~8,900 Helix-family tones** (Helix, Helix LT, Rack, Native).
 
 ```
 indexer/ (Python, run locally)                    web/ (static site, GitHub Pages)
-  scrape.py          browse listing -> raw.jsonl    index.html · app.js · style.css
+  scrape.py          browse listing -> raw.jsonl    index.html · app.js · shell.js · style.css
   backfill_bands.py  per-band search -> raw.jsonl   data/presets.json   metadata
   enrich_all.py      LLM: tags + band, one pass     data/vectors.bin    int8 embeddings
   embed.py           all-MiniLM-L6-v2 -> vectors    data/meta.json      model + dims
