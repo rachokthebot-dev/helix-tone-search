@@ -16,6 +16,8 @@ from pathlib import Path
 import numpy as np
 from fastembed import TextEmbedding
 
+import preset_files
+
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 BROWSER_MODEL = "Xenova/all-MiniLM-L6-v2"  # transformers.js equivalent
 DIMS = 384
@@ -24,7 +26,8 @@ DISPLAY_FIELDS = ["id", "name", "author", "band", "song", "artist", "amp",
                   "style", "device", "downloads", "date", "genre_tags",
                   "tone_tags", "enrich_source", "url",
                   "band_norm", "bands", "aliases", "band_inferred", "song_inferred",
-                  "mentioned_bands", "mentioned_songs", "gear", "features", "needs_ir", "snapshots"]
+                  "mentioned_bands", "mentioned_songs", "gear", "features", "needs_ir", "snapshots",
+                  "amps", "from_file"]
 
 # A preset built around third-party impulse responses sounds wrong without them,
 # so it's filtered out by default in the UI. Derived here rather than published as
@@ -145,6 +148,8 @@ def main():
     for r in rows:
         r["needs_ir"] = needs_ir(r)
         r["snapshots"] = snapshot_count(r)
+    parsed = preset_files.apply(rows)
+    print(f"[embed] {parsed} tones read from their preset file")
     presets = [{k: r.get(k) for k in DISPLAY_FIELDS} for r in rows]
     (outdir / "presets.json").write_text(json.dumps(presets, ensure_ascii=False))
 

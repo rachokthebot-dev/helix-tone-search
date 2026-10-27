@@ -74,7 +74,7 @@ async function boot() {
     genreStr: (r.genre_tags || []).join(' '), toneStr: (r.tone_tags || []).join(' '),
     bandExtra: [r.band_norm, r.band_inferred, r.song_inferred, ...(r.bands || []), ...(r.aliases || []),
                 ...(r.mentioned_bands || []), ...(r.mentioned_songs || [])].filter(Boolean).join(' '),
-    gearStr: (r.gear || []).join(' '), featStr: (r.features || []).join(' '),
+    gearStr: [...(r.gear || []), ...(r.amps || [])].join(' '), featStr: (r.features || []).join(' '),
   })));
 
   buildFacets();
@@ -193,7 +193,7 @@ const ownBandCount = r => ((r.bands && r.bands.length)
 // genuine hits apart from the semantic tail and to detect no-match queries.
 const searchText = r => [r.name, r.band, r.song, r.artist, r.style, r.band_norm, r.band_inferred, r.song_inferred,
   ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || []),
-  ...(r.genre_tags || []), ...(r.tone_tags || []), ...(r.gear || []), ...(r.features || [])]
+  ...(r.genre_tags || []), ...(r.tone_tags || []), ...(r.gear || []), ...(r.amps || []), ...(r.features || [])]
   .filter(Boolean).join(' ').toLowerCase();
 // Stopwords never appear in preset metadata, so requiring them made "praise and
 // worship electric" report zero matches over a screen of correct worship presets.
@@ -314,12 +314,13 @@ function card(r, score, idx) {
   const setlist = songCount >= 2 ? `<span class="setlist">covers ${songCount} songs</span>` : '';
   return `<article class="card" style="--stripe:${family(r).color};animation-delay:${delay}ms">
     <div class="cardtop"><span class="device">${esc(r.device || 'Helix')}</span>
-      ${r.snapshots != null ? `<span class="snapflag" title="${r.snapshots ? `The author describes ${r.snapshots} snapshots` : 'Uses snapshots — the author didn\'t say how many'}">${r.snapshots || ''}${r.snapshots ? ' ' : ''}snapshot${r.snapshots === 1 ? '' : 's'}</span>` : ''}
-      ${r.needs_ir ? `<span class="irflag" title="Built around third-party impulse responses — you need those IR files for it to sound as intended">needs IR</span>` : ''}
+      ${r.snapshots != null ? `<span class="snapflag" title="${r.from_file ? `${r.snapshots} audibly different snapshots in the preset file` : r.snapshots ? `The author describes ${r.snapshots} snapshots` : 'Uses snapshots — the author didn\'t say how many'}">${r.snapshots || ''}${r.snapshots ? ' ' : ''}snapshot${r.snapshots === 1 ? '' : 's'}</span>` : ''}
+      ${r.needs_ir ? `<span class="irflag" title="${r.from_file ? 'Loads a user IR slot — you need the author\'s IR file for it to sound as intended' : 'Built around third-party impulse responses — you need those IR files for it to sound as intended'}">needs IR</span>` : ''}
       <span class="dls">${r.downloads == null ? '<b>—</b> dl' : `<b>${r.downloads.toLocaleString()}</b> dl${rank ? ` <i>${rank}</i>` : ''}`}</span></div>
     <h3 class="name"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.name || 'Untitled')}</a></h3>${bl}
     ${also.length ? `<div class="sub">also: ${also.map(esc).join(', ')}</div>` : ''}
     <div class="sub">${[r.author ? 'by ' + esc(r.author) : '', r.date ? esc(r.date) : ''].filter(Boolean).join('  ·  ')}${setlist ? '  ·  ' + setlist : ''}</div>
+    ${(r.amps || []).length ? `<div class="sub amps">amp: ${r.amps.slice(0, 3).map(esc).join(', ')}${r.amps.length > 3 ? ` +${r.amps.length - 3}` : ''}</div>` : ''}
     ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
     ${chips ? `<div class="chips">${chips}</div>` : ''}
     ${gearChips ? `<div class="chips gearrow">${gearChips}</div>` : ''}
