@@ -128,6 +128,11 @@ def main():
 
     for r in rows:
         clean_record(r)  # before compose(): the embedding should see clean text too
+        r["needs_ir"] = needs_ir(r)
+        r["snapshots"] = snapshot_count(r)
+    # also before compose(): the file's effects and snapshot roles belong in the embedding
+    parsed = preset_files.apply(rows)
+    print(f"[embed] {parsed} tones read from their preset file")
 
     texts = [compose(r) for r in rows]
     model = TextEmbedding(model_name=MODEL)
@@ -145,11 +150,6 @@ def main():
 
     # Verbatim descriptions (user-authored text) are intentionally NOT published — the
     # useful signal is extracted into structured fields above and kept in the embedding.
-    for r in rows:
-        r["needs_ir"] = needs_ir(r)
-        r["snapshots"] = snapshot_count(r)
-    parsed = preset_files.apply(rows)
-    print(f"[embed] {parsed} tones read from their preset file")
     presets = [{k: r.get(k) for k in DISPLAY_FIELDS} for r in rows]
     (outdir / "presets.json").write_text(json.dumps(presets, ensure_ascii=False))
 
