@@ -301,13 +301,23 @@ function paint(items) {
 const ROLE_ORDER = ['clean', 'crunch', 'rhythm', 'lead', 'heavy', 'ambient'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortDate = d => { const [y, m] = (d || '').split('-'); return y ? (m ? `${MONTHS[+m - 1]} ${y}` : y) : ''; };
+// 16px line icons, drawn on a 16-unit grid to match the shell's stroke weight.
+const icon = (d, cls = '') => `<svg class="ic ${cls}" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC = {
+  download: icon('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
+  amp: icon('<rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2 7h12"/><circle cx="5" cy="5.25" r=".4"/><circle cx="8" cy="5.25" r=".4"/><circle cx="11" cy="5.25" r=".4"/>'),
+  match: icon('<circle cx="8" cy="8" r="6"/><path d="m5.5 8.2 1.7 1.7 3.3-3.6"/>', 'match'),
+  songs: icon('<path d="M6 12V3.5l7-1.5v8.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="11.5" cy="10.5" r="1.5"/>'),
+  open: icon('<path d="M5.5 3.5h7v7M12.5 3.5 4 12"/>'),
+  warn: icon('<path d="M8 2 14.5 13.5h-13Z"/><path d="M8 6.5v3M8 11.6v.1"/>', 'warn'),
+};
 
 // Eight slots, like the eight snapshot footswitches on a Helix; the used ones are lit.
 function snapRow(r) {
   const feats = (r.features || []).map(f => f.toLowerCase());
   const roles = ROLE_ORDER.filter(x => feats.includes(`${x} snapshot`));
   if (feats.includes('song sections')) roles.push('song sections');
-  if (r.snapshots == null) return r.from_file ? `<div class="snaps none">No snapshots</div>` : '';
+  if (!r.snapshots && r.snapshots !== 0) return '';
   if (r.snapshots === 0) return `<div class="snaps" title="The author mentions snapshots but not how many">Uses snapshots</div>`;
   const leds = Array.from({ length: 8 }, (_, i) => `<i${i < r.snapshots ? ' class="on"' : ''}></i>`).join('');
   const title = r.from_file ? 'Snapshots that sound different from each other, read from the preset file'
@@ -321,8 +331,10 @@ function card(r, score, idx) {
   const songName = r.song || r.song_inferred;
   const guessed = !r.band && r.band_inferred;
   const isGeneric = !bandName && !songName && !(r.mentioned_bands || []).length;
+  const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
+  const matchIc = bm ? `<span class="matchic" title="Matches your search by band or song" role="img" aria-label="Band or song match">${IC.match}</span>` : '';
   const bl = bandName || songName
-    ? `<div class="band">${esc(bandName || '')}${guessed ? ` <span class="song" title="Inferred from the preset name">(guessed)</span>` : ''}${songName ? ` <span class="song">${bandName ? '— ' : ''}${esc(songName)}</span>` : ''}</div>`
+    ? `<div class="band">${matchIc}${esc(bandName || '')}${guessed ? ` <span class="song" title="Inferred from the preset name">(guessed)</span>` : ''}${songName ? ` <span class="song">${bandName ? '— ' : ''}${esc(songName)}</span>` : ''}</div>`
     : (isGeneric ? `<div class="gp">General-purpose preset</div>` : '');
   const also = (r.mentioned_bands || []).filter(b => b.toLowerCase() !== (bandName || '').toLowerCase()).slice(0, 3);
   // Tone tags that a snapshot role already names, and gear that's already listed as
@@ -332,10 +344,9 @@ function card(r, score, idx) {
   const ampKeys = amps.map(a => a.toLowerCase());
   const chips = [...(r.genre_tags || []).slice(0, 3).map(g => `<span class="chip g">${esc(g)}</span>`),
     ...(r.tone_tags || []).filter(t => !feats.includes(`${t.toLowerCase()} snapshot`)).slice(0, 3)
-      .map(t => `<span class="chip t">${esc(t)}</span>`)].join('');
-  const gearChips = (r.gear || []).filter(g => !ampKeys.includes(g.toLowerCase())).slice(0, 4)
-    .map(g => `<button type="button" class="chip gear" data-gear="${esc(g)}" title="Show only presets with ${esc(g)}">${esc(g)}</button>`).join('');
-  const bm = isBandMatch(r), delay = Math.min(idx, 12) * 28;
+      .map(t => `<span class="chip t">${esc(t)}</span>`),
+    ...(r.gear || []).filter(g => !ampKeys.includes(g.toLowerCase())).slice(0, 4)
+      .map(g => `<button type="button" class="chip gear" data-gear="${esc(g)}" title="Show only presets with ${esc(g)}">${esc(g)}</button>`)].join('');
   const rank = dlRank(r.downloads);
   // Presets that cover a whole set are what "full gig" style queries are after,
   // but nothing on the card said so.
@@ -343,20 +354,18 @@ function card(r, score, idx) {
   const byline = [r.author ? `by ${esc(r.author)}` : '', shortDate(r.date)].filter(Boolean).join(', ');
   const irTip = r.from_file ? 'The preset loads an impulse response from a user IR slot. Without the author\'s IR file it won\'t sound as intended.'
                             : 'Built around third-party impulse responses. You need those IR files for it to sound as intended.';
+  const snaps = snapRow(r);
   return `<article class="card" style="--stripe:${family(r).color};animation-delay:${delay}ms">
     <div class="cardtop"><span class="device">${esc(r.device || 'Helix')}</span>
-      <span class="dls">${r.downloads == null ? 'Downloads unknown' : `<b>${r.downloads.toLocaleString()}</b> downloads${rank ? ` <i>${rank}</i>` : ''}`}</span></div>
+      <span class="dls" title="${r.downloads == null ? 'Downloads unknown' : `${r.downloads.toLocaleString()} downloads`}">${IC.download}${r.downloads == null ? '—' : `<b>${r.downloads.toLocaleString()}</b>`}${rank ? ` <i>${rank}</i>` : ''}</span>
+      <a class="open" href="${r.url}" target="_blank" rel="noopener" title="Open on CustomTone" aria-label="Open ${esc(r.name || 'preset')} on CustomTone">${IC.open}</a></div>
     <div class="head"><h3 class="name"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.name || 'Untitled')}</a></h3>${bl}
       ${also.length ? `<div class="sub">Also mentions ${also.map(esc).join(', ')}</div>` : ''}
-      ${byline ? `<div class="sub">${byline}</div>` : ''}
-      ${songCount >= 2 ? `<div class="sub setlist">Covers ${songCount} songs</div>` : ''}</div>
-    ${snapRow(r) || amps.length || r.needs_ir ? `<div class="rig">${snapRow(r)}
-      ${amps.length ? `<div class="amps"><span class="k">${amps.length > 1 ? 'Amps' : 'Amp'}</span> ${amps.slice(0, 3).map(esc).join(', ')}${amps.length > 3 ? ` and ${amps.length - 3} more` : ''}</div>` : ''}
-      ${r.needs_ir ? `<div class="irnote" title="${irTip}">Needs the author's IR file</div>` : ''}</div>` : ''}
+      ${byline || songCount >= 2 ? `<div class="sub byline"><span>${byline}</span>${songCount >= 2 ? `<span class="setlist" title="Covers ${songCount} songs">${IC.songs}${songCount} songs</span>` : ''}</div>` : ''}</div>
+    ${snaps || amps.length || r.needs_ir ? `<div class="rig">${snaps}
+      ${amps.length ? `<div class="amps" title="${amps.length > 1 ? 'Amps' : 'Amp'}">${IC.amp}<span>${amps.slice(0, 3).map(esc).join(', ')}${amps.length > 3 ? ` and ${amps.length - 3} more` : ''}</span></div>` : ''}
+      ${r.needs_ir ? `<div class="irnote" title="${irTip}">${IC.warn}Needs the author's IR file</div>` : ''}</div>` : ''}
     ${chips ? `<div class="chips">${chips}</div>` : ''}
-    ${gearChips ? `<div class="chips gearrow">${gearChips}</div>` : ''}
-    <div class="foot"><a class="open" href="${r.url}" target="_blank" rel="noopener">Open on CustomTone<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2 3 9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
-      ${bm ? `<span class="match band">Band or song match</span>` : ''}</div>
   </article>`;
 }
 
