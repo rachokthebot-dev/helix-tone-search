@@ -173,12 +173,23 @@ function passesExceptIR(r) {
   if (feat && !(r.features || []).some(f => f.toLowerCase() === feat)) return false;
   if (gearFilter && !(r.gear || []).some(g => g.toLowerCase() === gearFilter.toLowerCase())) return false;
   if ((r.downloads || 0) < min) return false;
+  if ($('gigready').checked && !isGigReady(r)) return false;
   // A count of 0 means "uses snapshots, number unknown": it only clears the lowest bar.
   const snap = $('snapcount').value;
   if (snap === 'none' && r.snapshots != null) return false;
   if (snap && snap !== 'none' && !(r.snapshots >= +snap || (r.snapshots === 0 && +snap <= 2))) return false;
   return true;
 }
+// A general-purpose preset you could play a whole gig on: tied to no band or song,
+// with at least three distinct snapshots that include a clean sound and a driven one.
+function isGigReady(r) {
+  if (r.band_norm || r.band || r.band_inferred || r.song || r.song_inferred) return false;
+  const f = (r.features || []).map(x => x.toLowerCase());
+  return r.snapshots >= 3 && f.includes('clean snapshot')
+    && (f.includes('lead snapshot') || f.includes('crunch snapshot'));
+}
+const browsing = () => $('gigready').checked || ['device', 'genre', 'feature', 'snapcount'].some(id => $(id).value)
+  || +$('mindl').value > 0;
 const bandBlob = r => [r.band, r.song, r.artist, r.band_norm, r.band_inferred, r.song_inferred,
   ...(r.bands || []), ...(r.aliases || []), ...(r.mentioned_bands || []), ...(r.mentioned_songs || [])]
   .filter(Boolean).join(' ').toLowerCase();
@@ -223,6 +234,7 @@ function rankItems(ranked, sort) {
     : all.filter(x => x.row.needs_ir && passesExceptIR(x.row)
                  && (!queryTerms.length || isRealMatch(x.row))).length;
   let items = all.filter(x => passes(x.row));
+  totalMatched = items.length;  // the relevance path below recounts its own tiers
   if (sort === 'downloads') { items.sort((a, b) => b.row.downloads - a.row.downloads); return items.slice(0, MAX_RESULTS); }
   if (sort === 'newest') { items.sort((a, b) => (b.row.date || '').localeCompare(a.row.date || '')); return items.slice(0, MAX_RESULTS); }
   if (!queryTerms.length) return items.slice(0, MAX_RESULTS);
@@ -256,7 +268,14 @@ async function render() {
   const query = $('q').value.trim();
   const sort = $('sort').value;
   queryTerms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!query) { view.hidden = true; startTyping(); return; }
+  // With no query, any filter turns the page into a browse of the catalog, most
+  // downloaded first: "gig-ready worship presets" needs no words.
+  if (!query) {
+    if (!browsing()) { view.hidden = true; startTyping(); return; }
+    stopTyping(); view.hidden = false;
+    paint(rankItems(presets.map((r, i) => [i, 0]).sort((a, b) => (presets[b[0]].downloads || 0) - (presets[a[0]].downloads || 0)), sort));
+    return;
+  }
   stopTyping(); view.hidden = false;
 
   const lex = mini.search(query).map(h => h._i);
@@ -375,6 +394,7 @@ function saveSettings() {
   try {
     const s = Object.fromEntries(CTRLS.map(id => [id, $(id).value]));
     s.showir = $('showir').checked;
+    s.gigready = $('gigready').checked;
     localStorage.setItem(LS_KEY, JSON.stringify(s));
   } catch (e) {}
 }
@@ -382,6 +402,7 @@ function loadSettings() {
   try { const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
     for (const id of CTRLS) { const el = $(id); if (s[id] != null && [...el.options].some(o => o.value === s[id])) el.value = s[id]; }
     if (typeof s.showir === 'boolean') $('showir').checked = s.showir;
+    if (typeof s.gigready === 'boolean') $('gigready').checked = s.gigready;
   } catch (e) {}
 }
 
@@ -396,7 +417,7 @@ function wire() {
   $('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(render, 130); });
   $('q').addEventListener('focus', stopTyping);
   $('q').addEventListener('blur', () => { if (!$('q').value) startTyping(); });
-  for (const id of [...CTRLS, 'showir']) $(id).addEventListener('change', () => { saveSettings(); render(); });
+  for (const id of [...CTRLS, 'showir', 'gigready']) $(id).addEventListener('change', () => { saveSettings(); render(); });
   // click a gear chip on any card to filter by that gear; click the pill to clear
   resultsEl.addEventListener('click', e => {
     const g = e.target.closest('.chip.gear');
